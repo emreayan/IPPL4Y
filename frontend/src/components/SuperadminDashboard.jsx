@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ippl4yUsers, iptvServiceCredentials } from '../authData';
+import { useApp } from '../context/AppContext';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import { ArrowLeft, Users, Building2, Search, Calendar, Mail, Shield, TrendingUp, DollarSign, Activity, CheckCircle, XCircle, AlertTriangle, RefreshCw, Globe } from 'lucide-react';
+import { ArrowLeft, Users, Building2, Search, Calendar, Mail, Shield, TrendingUp, DollarSign, Activity, CheckCircle, XCircle, AlertTriangle, RefreshCw, Globe, Image, Upload, Trash2, Tv } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Alert, AlertDescription } from './ui/alert';
 import axios from 'axios';
@@ -14,8 +15,12 @@ const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const SuperadminDashboard = () => {
   const navigate = useNavigate();
+  const { customLogo, refreshLogo } = useApp();
+  const fileInputRef = useRef(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoMessage, setLogoMessage] = useState({ type: '', text: '' });
   const [urlHealthData, setUrlHealthData] = useState([
     {
       provider: 'provider_turktelekom',
@@ -39,6 +44,78 @@ const SuperadminDashboard = () => {
     }
   ]);
   const [isChecking, setIsChecking] = useState(false);
+
+  // Logo upload handler
+  const handleLogoUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'];
+    if (!allowedTypes.includes(file.type)) {
+      setLogoMessage({ type: 'error', text: 'Desteklenmeyen dosya formatı. PNG, JPG veya SVG kullanın.' });
+      return;
+    }
+
+    // Validate file size (2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      setLogoMessage({ type: 'error', text: 'Dosya boyutu 2MB\'dan büyük olamaz.' });
+      return;
+    }
+
+    setLogoUploading(true);
+    setLogoMessage({ type: '', text: '' });
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      await axios.post(`${API_URL}/api/admin/logo`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      setLogoMessage({ type: 'success', text: 'Logo başarıyla yüklendi!' });
+      refreshLogo(); // Refresh logo across app
+    } catch (error) {
+      console.error('Logo upload failed:', error);
+      setLogoMessage({ 
+        type: 'error', 
+        text: error.response?.data?.detail || 'Logo yüklenirken bir hata oluştu.' 
+      });
+    } finally {
+      setLogoUploading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  // Logo delete handler
+  const handleLogoDelete = async () => {
+    if (!window.confirm('Logoyu silmek istediğinizden emin misiniz? Varsayılan logo kullanılacak.')) {
+      return;
+    }
+
+    setLogoUploading(true);
+    setLogoMessage({ type: '', text: '' });
+
+    try {
+      await axios.delete(`${API_URL}/api/admin/logo`);
+      setLogoMessage({ type: 'success', text: 'Logo silindi, varsayılan logo kullanılacak.' });
+      refreshLogo(); // Refresh logo across app
+    } catch (error) {
+      console.error('Logo delete failed:', error);
+      setLogoMessage({ 
+        type: 'error', 
+        text: error.response?.data?.detail || 'Logo silinirken bir hata oluştu.' 
+      });
+    } finally {
+      setLogoUploading(false);
+    }
+  };
 
   // All users (providers + customers)
   const allProviders = ippl4yUsers.admins || [];
