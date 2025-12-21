@@ -29,13 +29,8 @@ const Login = () => {
     const result = loginToApp(appUsername, appPassword);
     
     if (result.success) {
-      if (result.role === 'user' && result.requiresIptvSetup) {
-        // User needs to connect IPTV service
-        navigate('/iptv-setup');
-      } else {
-        // Admin or Superadmin can go directly to home
-        navigate('/home');
-      }
+      // All users go directly to home - IPTV setup is now device-based
+      navigate('/home');
     } else {
       setError(result.error);
     }
