@@ -195,6 +195,146 @@ async def check_single_url_health(url: str):
     result = await check_single_url(url)
     return result
 
+
+# ==================== LOGO MANAGEMENT ENDPOINTS ====================
+
+def get_current_logo_path() -> Optional[Path]:
+    """Find the current logo file if it exists"""
+    for ext in ALLOWED_LOGO_EXTENSIONS:
+        logo_path = UPLOADS_DIR / f"{LOGO_FILENAME}{ext}"
+        if logo_path.exists():
+            return logo_path
+    return None
+
+
+def delete_existing_logo():
+    """Delete any existing logo file"""
+    for ext in ALLOWED_LOGO_EXTENSIONS:
+        logo_path = UPLOADS_DIR / f"{LOGO_FILENAME}{ext}"
+        if logo_path.exists():
+            logo_path.unlink()
+
+
+@api_router.post("/admin/logo")
+async def upload_logo(file: UploadFile = File(...)):
+    """Upload a new logo (Superadmin only)"""
+    # Validate file extension
+    file_ext = Path(file.filename).suffix.lower()
+    if file_ext not in ALLOWED_LOGO_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Desteklenmeyen dosya formatı. İzin verilen: {', '.join(ALLOWED_LOGO_EXTENSIONS)}"
+        )
+    
+    # Read file content
+    content = await file.read()
+    
+    # Validate file size
+    if len(content) > MAX_LOGO_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Dosya boyutu çok büyük. Maksimum: {MAX_LOGO_SIZE // (1024*1024)}MB"
+        )
+    
+    # Delete existing logo
+    delete_existing_logo()
+    
+    # Save new logo
+    logo_path = UPLOADS_DIR / f"{LOGO_FILENAME}{file_ext}"
+    with open(logo_path, 'wb') as f:
+        f.write(content)
+    
+    # Store metadata in database
+    await db.settings.update_one(
+        {"key": "app_logo"},
+        {
+            "$set": {
+                "key": "app_logo",
+                "filename": f"{LOGO_FILENAME}{file_ext}",
+                "original_name": file.filename,
+                "uploaded_at": datetime.now(timezone.utc).isoformat(),
+                "size": len(content),
+                "content_type": file.content_type
+            }
+        },
+        upsert=True
+    )
+    
+    logger.info(f"Logo uploaded: {file.filename}")
+    
+    return {
+        "success": True,
+        "message": "Logo başarıyla yüklendi",
+        "logo_url": f"/api/admin/logo/file"
+    }
+
+
+@api_router.get("/admin/logo")
+async def get_logo_info():
+    """Get current logo information"""
+    logo_path = get_current_logo_path()
+    
+    if logo_path:
+        # Get metadata from database
+        metadata = await db.settings.find_one({"key": "app_logo"}, {"_id": 0})
+        return LogoResponse(
+            has_custom_logo=True,
+            logo_url="/api/admin/logo/file",
+            uploaded_at=metadata.get("uploaded_at") if metadata else None
+        )
+    
+    return LogoResponse(
+        has_custom_logo=False,
+        logo_url=None,
+        uploaded_at=None
+    )
+
+
+@api_router.get("/admin/logo/file")
+async def get_logo_file():
+    """Serve the logo file"""
+    logo_path = get_current_logo_path()
+    
+    if not logo_path:
+        raise HTTPException(status_code=404, detail="Logo bulunamadı")
+    
+    # Determine content type
+    ext = logo_path.suffix.lower()
+    content_types = {
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.svg': 'image/svg+xml'
+    }
+    
+    return FileResponse(
+        logo_path,
+        media_type=content_types.get(ext, 'application/octet-stream'),
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+    )
+
+
+@api_router.delete("/admin/logo")
+async def delete_logo():
+    """Delete the custom logo (revert to default)"""
+    logo_path = get_current_logo_path()
+    
+    if not logo_path:
+        raise HTTPException(status_code=404, detail="Silinecek logo bulunamadı")
+    
+    # Delete file
+    delete_existing_logo()
+    
+    # Remove metadata from database
+    await db.settings.delete_one({"key": "app_logo"})
+    
+    logger.info("Custom logo deleted")
+    
+    return {
+        "success": True,
+        "message": "Logo silindi, varsayılan logo kullanılacak"
+    }
+
 # Include the router in the main app
 app.include_router(api_router)
 
