@@ -116,6 +116,9 @@ backend:
       - working: true
         agent: "main"
         comment: "POST /api/health-check endpoint oluşturuldu. Birden fazla URL'yi paralel kontrol eder. GET /api/health-check/single tek URL kontrolü için. httpx kütüphanesi kullanılıyor. Test edildi - google.com, youtube.com başarılı, geçersiz URL'ler offline olarak döndü."
+      - working: true
+        agent: "testing"
+        comment: "Comprehensive backend API testing completed successfully. POST /api/health-check tested with ['https://google.com', 'https://httpbin.org/status/200', 'http://invalid-url-test.xyz'] - correctly returned online/offline statuses. GET /api/health-check/single tested with valid URL - returned proper response format. Invalid URL handling tested - correctly marked as offline with error message. All response formats match specification: {results, total, online, offline, slow} for POST and {url, status, response_time_ms, status_code, error, checked_at} for GET. Backend logs show no errors. All 3 test cases passed."
 
 frontend:
   - task: "Superadmin Dashboard URL Health Check UI"
