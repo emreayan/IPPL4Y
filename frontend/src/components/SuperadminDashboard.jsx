@@ -142,12 +142,17 @@ const SuperadminDashboard = () => {
         return <XCircle className="w-5 h-5 text-red-500" />;
       case 'slow':
         return <AlertTriangle className="w-5 h-5 text-amber-500" />;
+      case 'checking':
+        return <RefreshCw className="w-5 h-5 text-blue-500 animate-spin" />;
       default:
         return <Activity className="w-5 h-5 text-muted-foreground" />;
     }
   };
 
   const getStatusBadge = (status, responseTime) => {
+    if (status === 'checking') {
+      return <Badge className="bg-blue-500/10 text-blue-500 border-blue-500">Kontrol Ediliyor</Badge>;
+    }
     if (status === 'offline') {
       return <Badge className="bg-red-500/10 text-red-500 border-red-500">Çevrimdışı</Badge>;
     } else if (responseTime > 500) {
