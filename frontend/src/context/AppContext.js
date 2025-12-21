@@ -16,11 +16,15 @@ export const AppProvider = ({ children }) => {
   const [favorites, setFavorites] = useState({ channels: [], movies: [], series: [] });
   const [currentTab, setCurrentTab] = useState('live');
   const [searchQuery, setSearchQuery] = useState('');
+  const [theme, setTheme] = useState('ippl4y-prime');
+  const [channelVisibility, setChannelVisibility] = useState({});
 
   useEffect(() => {
     // Check if user is already logged in
-    const storedUser = localStorage.getItem('iptvUser');
-    const storedFavorites = localStorage.getItem('iptvFavorites');
+    const storedUser = localStorage.getItem('ippl4yUser');
+    const storedFavorites = localStorage.getItem('ippl4yFavorites');
+    const storedTheme = localStorage.getItem('ippl4yTheme');
+    const storedVisibility = localStorage.getItem('ippl4yChannelVisibility');
     
     if (storedUser) {
       setUser(JSON.parse(storedUser));
@@ -30,18 +34,39 @@ export const AppProvider = ({ children }) => {
     if (storedFavorites) {
       setFavorites(JSON.parse(storedFavorites));
     }
+
+    if (storedTheme) {
+      setTheme(storedTheme);
+      applyTheme(storedTheme);
+    } else {
+      applyTheme('ippl4y-prime');
+    }
+
+    if (storedVisibility) {
+      setChannelVisibility(JSON.parse(storedVisibility));
+    }
   }, []);
 
-  const login = (username, password, serverUrl) => {
-    // Mock login
-    const userData = { username, serverUrl };
-    localStorage.setItem('iptvUser', JSON.stringify(userData));
+  const applyTheme = (themeName) => {
+    document.documentElement.setAttribute('data-theme', themeName);
+  };
+
+  const changeTheme = (newTheme) => {
+    setTheme(newTheme);
+    localStorage.setItem('ippl4yTheme', newTheme);
+    applyTheme(newTheme);
+  };
+
+  const login = (username, password, serverUrl, role = 'user') => {
+    // Mock login with role support
+    const userData = { username, serverUrl, role };
+    localStorage.setItem('ippl4yUser', JSON.stringify(userData));
     setUser(userData);
     setIsAuthenticated(true);
   };
 
   const logout = () => {
-    localStorage.removeItem('iptvUser');
+    localStorage.removeItem('ippl4yUser');
     setUser(null);
     setIsAuthenticated(false);
   };
@@ -58,7 +83,7 @@ export const AppProvider = ({ children }) => {
         updated = { ...prev, [key]: [...prev[key], item] };
       }
       
-      localStorage.setItem('iptvFavorites', JSON.stringify(updated));
+      localStorage.setItem('ippl4yFavorites', JSON.stringify(updated));
       return updated;
     });
   };
@@ -66,6 +91,18 @@ export const AppProvider = ({ children }) => {
   const isFavorite = (itemId, type) => {
     const key = type === 'channel' ? 'channels' : type === 'movie' ? 'movies' : 'series';
     return favorites[key].some(fav => fav.id === itemId);
+  };
+
+  const toggleChannelVisibility = (channelId) => {
+    setChannelVisibility(prev => {
+      const updated = { ...prev, [channelId]: !prev[channelId] };
+      localStorage.setItem('ippl4yChannelVisibility', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const isChannelVisible = (channelId) => {
+    return channelVisibility[channelId] !== false; // Default to visible
   };
 
   return (
@@ -81,7 +118,12 @@ export const AppProvider = ({ children }) => {
         currentTab,
         setCurrentTab,
         searchQuery,
-        setSearchQuery
+        setSearchQuery,
+        theme,
+        changeTheme,
+        channelVisibility,
+        toggleChannelVisibility,
+        isChannelVisible
       }}
     >
       {children}
