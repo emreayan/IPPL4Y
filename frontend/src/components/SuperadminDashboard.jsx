@@ -311,6 +311,13 @@ const SuperadminDashboard = () => {
               <Activity className="w-4 h-4 mr-2" />
               Platform Sağlığı
             </TabsTrigger>
+            <TabsTrigger 
+              value="branding" 
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
+              <Image className="w-4 h-4 mr-2" />
+              Logo Yönetimi
+            </TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
