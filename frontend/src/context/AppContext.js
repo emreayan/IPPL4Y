@@ -288,7 +288,7 @@ export const AppProvider = ({ children }) => {
   };
 
   // Step 1: Login to IPPL4Y application
-  const loginToApp = (username, password) => {
+  const loginToApp = async (username, password) => {
     // Check superadmin
     if (username === ippl4yUsers.superadmin.username && password === ippl4yUsers.superadmin.password) {
       const userData = { ...ippl4yUsers.superadmin };
@@ -321,6 +321,18 @@ export const AppProvider = ({ children }) => {
       localStorage.setItem('ippl4yUser', JSON.stringify(userData));
       setUser(userData);
       setIsAuthenticated(true);
+      
+      // Auto-register device and fetch playlists for customer
+      try {
+        const creds = getDeviceCredentials();
+        const regResult = await registerDevice(creds.device_id, creds.device_key, 'web');
+        if (regResult.success) {
+          await fetchPlaylists(creds.device_id);
+        }
+      } catch (err) {
+        console.error('Failed to init device:', err);
+      }
+      
       return { success: true, role: 'user', requiresIptvSetup: true };
     }
 
