@@ -119,12 +119,16 @@ export const AppProvider = ({ children }) => {
       const response = await axios.get(`${API_URL}/api/device/${deviceId}/playlists`);
       const data = response.data;
       
+      console.log('Fetched playlists:', data);
+      console.log('Active playlist:', data.active_playlist);
+      
       setPlaylists(data.playlists || []);
       setActivePlaylist(data.active_playlist || null);
       
       // If we have an active playlist, set it as the IPTV service
       if (data.active_playlist) {
         const playlist = data.active_playlist;
+        console.log('Setting active playlist:', playlist);
         const serviceData = {
           id: playlist.id,
           name: playlist.playlist_name,
