@@ -644,6 +644,595 @@ def run_logo_management_tests():
     return logo_results
 
 
+# ==================== DEVICE & PLAYLIST MANAGEMENT TESTS ====================
+
+# Test device credentials as specified in review request
+TEST_DEVICE_ID = "11:30:02:28:02:bb"
+TEST_DEVICE_KEY = "1323008583"
+
+def test_device_register():
+    """Test POST /api/device/register - Device registration"""
+    print("\n=== Testing POST /api/device/register ===")
+    
+    payload = {
+        "device_id": TEST_DEVICE_ID,
+        "device_key": TEST_DEVICE_KEY,
+        "platform": "android_tv"
+    }
+    
+    try:
+        print(f"Sending POST request to: {BACKEND_URL}/device/register")
+        print(f"Payload: {json.dumps(payload, indent=2)}")
+        
+        response = requests.post(
+            f"{BACKEND_URL}/device/register",
+            json=payload,
+            timeout=30
+        )
+        
+        print(f"Response Status Code: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Response Data: {json.dumps(data, indent=2)}")
+            
+            # Validate response structure
+            required_fields = ['success', 'message', 'device']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                print(f"❌ FAIL: Missing required fields: {missing_fields}")
+                return False
+            
+            if data['success'] is not True:
+                print(f"❌ FAIL: Expected success to be true, got: {data['success']}")
+                return False
+            
+            # Validate device object
+            device = data['device']
+            device_required_fields = ['device_id', 'device_key', 'platform', 'status', 'created_at', 'last_seen_at']
+            missing_device_fields = [field for field in device_required_fields if field not in device]
+            
+            if missing_device_fields:
+                print(f"❌ FAIL: Missing device fields: {missing_device_fields}")
+                return False
+            
+            if device['device_id'] != TEST_DEVICE_ID:
+                print(f"❌ FAIL: Device ID mismatch. Expected: {TEST_DEVICE_ID}, Got: {device['device_id']}")
+                return False
+            
+            if device['device_key'] != TEST_DEVICE_KEY:
+                print(f"❌ FAIL: Device Key mismatch. Expected: {TEST_DEVICE_KEY}, Got: {device['device_key']}")
+                return False
+            
+            print("✅ POST /api/device/register - All validations passed!")
+            return True
+            
+        else:
+            print(f"❌ FAIL: HTTP {response.status_code}")
+            print(f"Response: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ FAIL: Unexpected error - {str(e)}")
+        return False
+
+
+def test_device_validate():
+    """Test POST /api/device/validate - Device validation"""
+    print("\n=== Testing POST /api/device/validate ===")
+    
+    payload = {
+        "device_id": TEST_DEVICE_ID,
+        "device_key": TEST_DEVICE_KEY
+    }
+    
+    try:
+        print(f"Sending POST request to: {BACKEND_URL}/device/validate")
+        print(f"Payload: {json.dumps(payload, indent=2)}")
+        
+        response = requests.post(
+            f"{BACKEND_URL}/device/validate",
+            json=payload,
+            timeout=30
+        )
+        
+        print(f"Response Status Code: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Response Data: {json.dumps(data, indent=2)}")
+            
+            # Validate response structure
+            required_fields = ['valid', 'message']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                print(f"❌ FAIL: Missing required fields: {missing_fields}")
+                return False
+            
+            if data['valid'] is not True:
+                print(f"❌ FAIL: Expected valid to be true, got: {data['valid']}")
+                return False
+            
+            print("✅ POST /api/device/validate - All validations passed!")
+            return True
+            
+        else:
+            print(f"❌ FAIL: HTTP {response.status_code}")
+            print(f"Response: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ FAIL: Unexpected error - {str(e)}")
+        return False
+
+
+def test_device_validate_invalid_format():
+    """Test device validation with invalid formats"""
+    print("\n=== Testing Device Validation - Invalid Formats ===")
+    
+    # Test invalid device_id format (not MAC format)
+    invalid_device_payload = {
+        "device_id": "invalid-device-id",
+        "device_key": TEST_DEVICE_KEY
+    }
+    
+    try:
+        print("Testing invalid device_id format...")
+        response = requests.post(
+            f"{BACKEND_URL}/device/validate",
+            json=invalid_device_payload,
+            timeout=30
+        )
+        
+        if response.status_code == 400:
+            print("✅ Invalid device_id format correctly rejected")
+        else:
+            print(f"❌ FAIL: Expected 400 for invalid device_id, got: {response.status_code}")
+            return False
+        
+        # Test invalid device_key format (non-numeric)
+        invalid_key_payload = {
+            "device_id": TEST_DEVICE_ID,
+            "device_key": "invalid-key"
+        }
+        
+        print("Testing invalid device_key format...")
+        response = requests.post(
+            f"{BACKEND_URL}/device/validate",
+            json=invalid_key_payload,
+            timeout=30
+        )
+        
+        if response.status_code == 400:
+            print("✅ Invalid device_key format correctly rejected")
+            return True
+        else:
+            print(f"❌ FAIL: Expected 400 for invalid device_key, got: {response.status_code}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ FAIL: Unexpected error - {str(e)}")
+        return False
+
+
+def test_playlist_add_m3u():
+    """Test POST /api/device/{device_id}/playlist - Add M3U playlist"""
+    print("\n=== Testing POST /api/device/{device_id}/playlist (M3U) ===")
+    
+    payload = {
+        "playlist_name": "Test M3U Playlist",
+        "playlist_url": "http://test.com/playlist.m3u",
+        "playlist_type": "m3u"
+    }
+    
+    try:
+        print(f"Sending POST request to: {BACKEND_URL}/device/{TEST_DEVICE_ID}/playlist")
+        print(f"Payload: {json.dumps(payload, indent=2)}")
+        
+        response = requests.post(
+            f"{BACKEND_URL}/device/{TEST_DEVICE_ID}/playlist",
+            json=payload,
+            timeout=30
+        )
+        
+        print(f"Response Status Code: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Response Data: {json.dumps(data, indent=2)}")
+            
+            # Validate response structure
+            required_fields = ['success', 'message', 'playlist']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                print(f"❌ FAIL: Missing required fields: {missing_fields}")
+                return False
+            
+            if data['success'] is not True:
+                print(f"❌ FAIL: Expected success to be true, got: {data['success']}")
+                return False
+            
+            # Validate playlist object
+            playlist = data['playlist']
+            playlist_required_fields = ['id', 'device_id', 'playlist_name', 'playlist_url', 'playlist_type', 'is_active', 'created_at']
+            missing_playlist_fields = [field for field in playlist_required_fields if field not in playlist]
+            
+            if missing_playlist_fields:
+                print(f"❌ FAIL: Missing playlist fields: {missing_playlist_fields}")
+                return False
+            
+            if playlist['playlist_type'] != 'm3u':
+                print(f"❌ FAIL: Expected playlist_type 'm3u', got: {playlist['playlist_type']}")
+                return False
+            
+            # Store playlist ID for later tests
+            global test_m3u_playlist_id
+            test_m3u_playlist_id = playlist['id']
+            
+            print("✅ POST /api/device/{device_id}/playlist (M3U) - All validations passed!")
+            return True
+            
+        else:
+            print(f"❌ FAIL: HTTP {response.status_code}")
+            print(f"Response: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ FAIL: Unexpected error - {str(e)}")
+        return False
+
+
+def test_playlist_add_xtream():
+    """Test POST /api/device/{device_id}/playlist - Add Xtream playlist"""
+    print("\n=== Testing POST /api/device/{device_id}/playlist (Xtream) ===")
+    
+    payload = {
+        "playlist_name": "Test Xtream Playlist",
+        "playlist_url": "http://xtream.com:8080",
+        "playlist_type": "xtream",
+        "xtream_username": "testuser",
+        "xtream_password": "testpass"
+    }
+    
+    try:
+        print(f"Sending POST request to: {BACKEND_URL}/device/{TEST_DEVICE_ID}/playlist")
+        print(f"Payload: {json.dumps(payload, indent=2)}")
+        
+        response = requests.post(
+            f"{BACKEND_URL}/device/{TEST_DEVICE_ID}/playlist",
+            json=payload,
+            timeout=30
+        )
+        
+        print(f"Response Status Code: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Response Data: {json.dumps(data, indent=2)}")
+            
+            # Validate response structure
+            required_fields = ['success', 'message', 'playlist']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                print(f"❌ FAIL: Missing required fields: {missing_fields}")
+                return False
+            
+            if data['success'] is not True:
+                print(f"❌ FAIL: Expected success to be true, got: {data['success']}")
+                return False
+            
+            # Validate playlist object
+            playlist = data['playlist']
+            if playlist['playlist_type'] != 'xtream':
+                print(f"❌ FAIL: Expected playlist_type 'xtream', got: {playlist['playlist_type']}")
+                return False
+            
+            # Password should be masked in response
+            if playlist.get('xtream_password') != '***':
+                print(f"❌ FAIL: Expected password to be masked, got: {playlist.get('xtream_password')}")
+                return False
+            
+            # Store playlist ID for later tests
+            global test_xtream_playlist_id
+            test_xtream_playlist_id = playlist['id']
+            
+            print("✅ POST /api/device/{device_id}/playlist (Xtream) - All validations passed!")
+            return True
+            
+        else:
+            print(f"❌ FAIL: HTTP {response.status_code}")
+            print(f"Response: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ FAIL: Unexpected error - {str(e)}")
+        return False
+
+
+def test_playlist_add_xtream_missing_credentials():
+    """Test Xtream playlist without required credentials"""
+    print("\n=== Testing Xtream Playlist - Missing Credentials ===")
+    
+    payload = {
+        "playlist_name": "Invalid Xtream",
+        "playlist_url": "http://xtream.com:8080",
+        "playlist_type": "xtream"
+        # Missing xtream_username and xtream_password
+    }
+    
+    try:
+        print("Testing Xtream playlist without credentials...")
+        response = requests.post(
+            f"{BACKEND_URL}/device/{TEST_DEVICE_ID}/playlist",
+            json=payload,
+            timeout=30
+        )
+        
+        if response.status_code == 400:
+            data = response.json()
+            if 'kullanıcı adı ve şifre gerekli' in data.get('detail', ''):
+                print("✅ Xtream without credentials correctly rejected")
+                return True
+            else:
+                print(f"❌ FAIL: Expected proper error message, got: {data}")
+                return False
+        else:
+            print(f"❌ FAIL: Expected 400 for missing credentials, got: {response.status_code}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ FAIL: Unexpected error - {str(e)}")
+        return False
+
+
+def test_get_device_playlists():
+    """Test GET /api/device/{device_id}/playlists"""
+    print("\n=== Testing GET /api/device/{device_id}/playlists ===")
+    
+    try:
+        print(f"Sending GET request to: {BACKEND_URL}/device/{TEST_DEVICE_ID}/playlists")
+        
+        response = requests.get(
+            f"{BACKEND_URL}/device/{TEST_DEVICE_ID}/playlists",
+            timeout=30
+        )
+        
+        print(f"Response Status Code: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Response Data: {json.dumps(data, indent=2)}")
+            
+            # Validate response structure
+            required_fields = ['device_id', 'device_status', 'playlists', 'active_playlist']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                print(f"❌ FAIL: Missing required fields: {missing_fields}")
+                return False
+            
+            if data['device_id'] != TEST_DEVICE_ID:
+                print(f"❌ FAIL: Device ID mismatch. Expected: {TEST_DEVICE_ID}, Got: {data['device_id']}")
+                return False
+            
+            if not isinstance(data['playlists'], list):
+                print(f"❌ FAIL: Expected playlists to be a list, got: {type(data['playlists'])}")
+                return False
+            
+            # Should have at least 2 playlists (M3U and Xtream added earlier)
+            if len(data['playlists']) < 2:
+                print(f"❌ FAIL: Expected at least 2 playlists, got: {len(data['playlists'])}")
+                return False
+            
+            # Should have an active playlist
+            if data['active_playlist'] is None:
+                print("❌ FAIL: Expected an active playlist, got None")
+                return False
+            
+            print("✅ GET /api/device/{device_id}/playlists - All validations passed!")
+            return True
+            
+        else:
+            print(f"❌ FAIL: HTTP {response.status_code}")
+            print(f"Response: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ FAIL: Unexpected error - {str(e)}")
+        return False
+
+
+def test_set_active_playlist():
+    """Test PUT /api/device/{device_id}/playlist/{playlist_id}/active"""
+    print("\n=== Testing PUT /api/device/{device_id}/playlist/{playlist_id}/active ===")
+    
+    try:
+        # Use the Xtream playlist ID from earlier test
+        playlist_id = test_xtream_playlist_id
+        print(f"Setting playlist {playlist_id} as active")
+        
+        response = requests.put(
+            f"{BACKEND_URL}/device/{TEST_DEVICE_ID}/playlist/{playlist_id}/active",
+            timeout=30
+        )
+        
+        print(f"Response Status Code: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Response Data: {json.dumps(data, indent=2)}")
+            
+            # Validate response structure
+            required_fields = ['success', 'message', 'active_playlist_id']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                print(f"❌ FAIL: Missing required fields: {missing_fields}")
+                return False
+            
+            if data['success'] is not True:
+                print(f"❌ FAIL: Expected success to be true, got: {data['success']}")
+                return False
+            
+            if data['active_playlist_id'] != playlist_id:
+                print(f"❌ FAIL: Active playlist ID mismatch. Expected: {playlist_id}, Got: {data['active_playlist_id']}")
+                return False
+            
+            print("✅ PUT /api/device/{device_id}/playlist/{playlist_id}/active - All validations passed!")
+            return True
+            
+        else:
+            print(f"❌ FAIL: HTTP {response.status_code}")
+            print(f"Response: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ FAIL: Unexpected error - {str(e)}")
+        return False
+
+
+def test_delete_playlist():
+    """Test DELETE /api/device/{device_id}/playlist/{playlist_id}"""
+    print("\n=== Testing DELETE /api/device/{device_id}/playlist/{playlist_id} ===")
+    
+    try:
+        # Delete the M3U playlist
+        playlist_id = test_m3u_playlist_id
+        print(f"Deleting playlist {playlist_id}")
+        
+        response = requests.delete(
+            f"{BACKEND_URL}/device/{TEST_DEVICE_ID}/playlist/{playlist_id}",
+            timeout=30
+        )
+        
+        print(f"Response Status Code: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Response Data: {json.dumps(data, indent=2)}")
+            
+            # Validate response structure
+            required_fields = ['success', 'message']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                print(f"❌ FAIL: Missing required fields: {missing_fields}")
+                return False
+            
+            if data['success'] is not True:
+                print(f"❌ FAIL: Expected success to be true, got: {data['success']}")
+                return False
+            
+            print("✅ DELETE /api/device/{device_id}/playlist/{playlist_id} - All validations passed!")
+            return True
+            
+        else:
+            print(f"❌ FAIL: HTTP {response.status_code}")
+            print(f"Response: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ FAIL: Unexpected error - {str(e)}")
+        return False
+
+
+def test_playlist_limit():
+    """Test maximum playlist limit (10 playlists per device)"""
+    print("\n=== Testing Playlist Limit (Max 10) ===")
+    
+    try:
+        # First, get current playlist count
+        response = requests.get(f"{BACKEND_URL}/device/{TEST_DEVICE_ID}/playlists", timeout=30)
+        if response.status_code != 200:
+            print("❌ FAIL: Could not get current playlists")
+            return False
+        
+        current_count = len(response.json()['playlists'])
+        print(f"Current playlist count: {current_count}")
+        
+        # Add playlists until we reach the limit
+        playlists_to_add = 10 - current_count
+        
+        for i in range(playlists_to_add):
+            payload = {
+                "playlist_name": f"Test Playlist {i+1}",
+                "playlist_url": f"http://test{i+1}.com/playlist.m3u",
+                "playlist_type": "m3u"
+            }
+            
+            response = requests.post(
+                f"{BACKEND_URL}/device/{TEST_DEVICE_ID}/playlist",
+                json=payload,
+                timeout=30
+            )
+            
+            if response.status_code != 200:
+                print(f"❌ FAIL: Could not add playlist {i+1}")
+                return False
+        
+        # Now try to add one more (should fail)
+        payload = {
+            "playlist_name": "Exceeding Limit Playlist",
+            "playlist_url": "http://exceed.com/playlist.m3u",
+            "playlist_type": "m3u"
+        }
+        
+        response = requests.post(
+            f"{BACKEND_URL}/device/{TEST_DEVICE_ID}/playlist",
+            json=payload,
+            timeout=30
+        )
+        
+        if response.status_code == 400:
+            data = response.json()
+            if 'Maksimum playlist sayısına ulaşıldı' in data.get('detail', ''):
+                print("✅ Playlist limit correctly enforced")
+                return True
+            else:
+                print(f"❌ FAIL: Expected proper limit error message, got: {data}")
+                return False
+        else:
+            print(f"❌ FAIL: Expected 400 for exceeding limit, got: {response.status_code}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ FAIL: Unexpected error - {str(e)}")
+        return False
+
+
+def run_device_playlist_tests():
+    """Run all device and playlist management tests"""
+    print("\n📱 Starting Device & Playlist Management API Tests")
+    print("="*60)
+    
+    device_results = []
+    
+    # Initialize global variables for playlist IDs
+    global test_m3u_playlist_id, test_xtream_playlist_id
+    test_m3u_playlist_id = None
+    test_xtream_playlist_id = None
+    
+    # Device Management Tests
+    device_results.append(("POST /api/device/register", test_device_register()))
+    device_results.append(("POST /api/device/validate", test_device_validate()))
+    device_results.append(("Device Validation - Invalid Formats", test_device_validate_invalid_format()))
+    
+    # Playlist Management Tests
+    device_results.append(("POST /api/device/{device_id}/playlist (M3U)", test_playlist_add_m3u()))
+    device_results.append(("POST /api/device/{device_id}/playlist (Xtream)", test_playlist_add_xtream()))
+    device_results.append(("Xtream - Missing Credentials", test_playlist_add_xtream_missing_credentials()))
+    device_results.append(("GET /api/device/{device_id}/playlists", test_get_device_playlists()))
+    device_results.append(("PUT /api/device/{device_id}/playlist/{playlist_id}/active", test_set_active_playlist()))
+    device_results.append(("DELETE /api/device/{device_id}/playlist/{playlist_id}", test_delete_playlist()))
+    device_results.append(("Playlist Limit Test (Max 10)", test_playlist_limit()))
+    
+    return device_results
+
+
 def run_health_check_tests():
     """Run all health check tests"""
     print("\n🏥 Starting Health Check API Tests")
