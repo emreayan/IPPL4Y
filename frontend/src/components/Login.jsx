@@ -17,7 +17,7 @@ const Login = () => {
   const { loginToApp, customLogo, logoLoading } = useApp();
   const navigate = useNavigate();
 
-  const handleLogin = (e, role) => {
+  const handleLogin = async (e, role) => {
     e.preventDefault();
     setError('');
 
