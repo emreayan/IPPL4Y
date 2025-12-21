@@ -234,11 +234,22 @@ export const AppProvider = ({ children }) => {
       setUser(userData);
       setIsAuthenticated(true);
       
-      // If user is a customer, fetch their playlists
-      if (userData.role === 'user' && storedDeviceInfo) {
-        const device = JSON.parse(storedDeviceInfo);
-        setDeviceInfo(device);
-        fetchPlaylists(device.device_id);
+      // If user is a customer, auto-register device and fetch playlists
+      if (userData.role === 'user') {
+        const initDevice = async () => {
+          // Get device credentials
+          const creds = getDeviceCredentials();
+          
+          // Register device
+          const regResult = await registerDevice(creds.device_id, creds.device_key, 'web');
+          
+          if (regResult.success) {
+            // Fetch playlists for this device
+            await fetchPlaylists(creds.device_id);
+          }
+        };
+        
+        initDevice();
       }
     }
 
@@ -264,7 +275,7 @@ export const AppProvider = ({ children }) => {
 
     // Fetch logo on app load
     fetchLogo();
-  }, [fetchLogo, fetchPlaylists]);
+  }, [fetchLogo, fetchPlaylists, getDeviceCredentials, registerDevice]);
 
   const applyTheme = (themeName) => {
     document.documentElement.setAttribute('data-theme', themeName);
