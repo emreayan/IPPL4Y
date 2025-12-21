@@ -33,7 +33,7 @@ const LiveTVContent = () => {
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Fetch channels from Xtream API
+  // Fetch channels from API
   const fetchChannels = useCallback(async () => {
     if (!activePlaylist) return;
 
@@ -41,48 +41,21 @@ const LiveTVContent = () => {
     setError(null);
 
     try {
-      const { playlist_url, playlist_type, xtream_username } = activePlaylist;
-      
-      // Get password from localStorage (we stored it when adding playlist)
-      const storedPlaylist = JSON.parse(localStorage.getItem('ippl4yActivePlaylistFull') || '{}');
-      const xtream_password = storedPlaylist.xtream_password || '';
+      // Use the parse endpoint which handles both M3U and Xtream
+      const response = await axios.get(`${API_URL}/api/playlist/${activePlaylist.id}/parse`);
 
-      if (playlist_type === 'xtream' && xtream_username) {
-        // Use Xtream API
-        const response = await axios.post(`${API_URL}/api/xtream/full-data`, null, {
-          params: {
-            server_url: playlist_url,
-            username: xtream_username,
-            password: xtream_password
-          }
-        });
-
-        if (response.data.success) {
-          // Filter out adult categories for now
-          const filteredCategories = response.data.categories.filter(
-            cat => !cat.name.toLowerCase().includes('adult') && 
-                   !cat.name.toLowerCase().includes('porno') &&
-                   !cat.name.toLowerCase().includes('+18')
+      if (response.data.success) {
+        setCategories(response.data.categories || []);
+        if (response.data.categories?.length > 0 && !selectedCategory) {
+          // Try to find a Turkish category first
+          const turkCat = response.data.categories.find(c => 
+            c.name.toUpperCase().includes('TURK') || 
+            c.name.toUpperCase().includes('TÜRKİYE')
           );
-          setCategories(filteredCategories);
-          if (filteredCategories.length > 0 && !selectedCategory) {
-            setSelectedCategory(filteredCategories[0]);
-          }
-        } else {
-          setError(response.data.error || 'Kanallar yüklenemedi');
+          setSelectedCategory(turkCat || response.data.categories[0]);
         }
       } else {
-        // Use M3U parser for non-xtream playlists
-        const response = await axios.get(`${API_URL}/api/playlist/${activePlaylist.id}/parse`);
-        
-        if (response.data.success) {
-          setCategories(response.data.categories);
-          if (response.data.categories.length > 0 && !selectedCategory) {
-            setSelectedCategory(response.data.categories[0]);
-          }
-        } else {
-          setError(response.data.error || 'Kanallar yüklenemedi');
-        }
+        setError(response.data.error || 'Kanallar yüklenemedi');
       }
     } catch (err) {
       console.error('Failed to fetch channels:', err);
