@@ -749,6 +749,172 @@ const SuperadminDashboard = () => {
               </div>
             </Card>
           </TabsContent>
+
+          {/* Logo/Branding Management Tab */}
+          <TabsContent value="branding">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Current Logo Preview */}
+              <Card className="p-6 bg-card border-border">
+                <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center">
+                  <Image className="w-5 h-5 mr-2 text-primary" />
+                  Mevcut Logo
+                </h3>
+                
+                <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-border rounded-lg bg-secondary/30">
+                  {customLogo ? (
+                    <div className="space-y-4 text-center">
+                      <div className="w-32 h-32 rounded-xl overflow-hidden shadow-lg mx-auto bg-white/10">
+                        <img 
+                          src={customLogo} 
+                          alt="Mevcut Logo" 
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                      <Badge className="bg-green-500/10 text-green-500 border-green-500">
+                        Özel Logo Aktif
+                      </Badge>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 text-center">
+                      <div className="w-32 h-32 bg-gradient-to-br from-primary to-accent rounded-xl flex items-center justify-center shadow-lg mx-auto">
+                        <Tv className="w-16 h-16 text-primary-foreground" />
+                      </div>
+                      <Badge className="bg-blue-500/10 text-blue-500 border-blue-500">
+                        Varsayılan Logo
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+
+                {/* Logo Info */}
+                <div className="mt-4 p-4 bg-secondary/30 rounded-lg">
+                  <h4 className="text-sm font-medium text-foreground mb-2">Logo Bilgileri</h4>
+                  <div className="space-y-1 text-xs text-muted-foreground">
+                    <p>• Önerilen boyut: 200x200 piksel</p>
+                    <p>• Maksimum dosya boyutu: 2MB</p>
+                    <p>• Desteklenen formatlar: PNG, JPG, SVG</p>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Logo Upload Section */}
+              <Card className="p-6 bg-card border-border">
+                <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center">
+                  <Upload className="w-5 h-5 mr-2 text-primary" />
+                  Logo Yükle
+                </h3>
+
+                {/* Status Message */}
+                {logoMessage.text && (
+                  <Alert className={`mb-4 ${logoMessage.type === 'success' ? 'bg-green-500/10 border-green-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
+                    {logoMessage.type === 'success' ? (
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-red-500" />
+                    )}
+                    <AlertDescription className={logoMessage.type === 'success' ? 'text-green-500' : 'text-red-500'}>
+                      {logoMessage.text}
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Upload Area */}
+                <div 
+                  className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".png,.jpg,.jpeg,.svg"
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                  />
+                  <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-foreground font-medium mb-2">
+                    {logoUploading ? 'Yükleniyor...' : 'Logo yüklemek için tıklayın'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    PNG, JPG veya SVG (maks. 2MB)
+                  </p>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="mt-6 space-y-3">
+                  <Button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={logoUploading}
+                    className="w-full bg-primary hover:bg-primary/90"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    {logoUploading ? 'Yükleniyor...' : 'Yeni Logo Yükle'}
+                  </Button>
+
+                  {customLogo && (
+                    <Button
+                      onClick={handleLogoDelete}
+                      disabled={logoUploading}
+                      variant="outline"
+                      className="w-full border-red-500/50 text-red-500 hover:bg-red-500/10"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Logoyu Sil (Varsayılana Dön)
+                    </Button>
+                  )}
+                </div>
+
+                {/* Info Box */}
+                <Alert className="mt-6 bg-primary/10 border-primary/20">
+                  <Shield className="h-4 w-4 text-primary" />
+                  <AlertDescription className="text-foreground">
+                    <p className="text-sm">
+                      Yüklenen logo tüm kullanıcıların Login sayfasında ve Navigation'da görünecektir.
+                    </p>
+                  </AlertDescription>
+                </Alert>
+              </Card>
+            </div>
+
+            {/* Preview Section */}
+            <Card className="p-6 bg-card border-border mt-6">
+              <h3 className="text-lg font-semibold text-foreground mb-4">Önizleme</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Login Preview */}
+                <div className="p-4 bg-gradient-to-br from-[hsl(214,32%,8%)] via-[hsl(214,28%,12%)] to-[hsl(214,32%,8%)] rounded-lg">
+                  <p className="text-xs text-muted-foreground mb-3">Login Sayfası Önizlemesi</p>
+                  <div className="flex flex-col items-center space-y-2">
+                    {customLogo ? (
+                      <div className="w-12 h-12 rounded-xl overflow-hidden">
+                        <img src={customLogo} alt="Logo" className="w-full h-full object-contain" />
+                      </div>
+                    ) : (
+                      <div className="w-12 h-12 bg-gradient-to-br from-primary to-accent rounded-xl flex items-center justify-center">
+                        <Tv className="w-6 h-6 text-primary-foreground" />
+                      </div>
+                    )}
+                    <span className="text-xl font-bold text-foreground">IPPL4Y</span>
+                  </div>
+                </div>
+
+                {/* Navigation Preview */}
+                <div className="p-4 bg-card rounded-lg border border-border">
+                  <p className="text-xs text-muted-foreground mb-3">Navigation Önizlemesi</p>
+                  <div className="flex items-center space-x-3">
+                    {customLogo ? (
+                      <div className="w-8 h-8 rounded-lg overflow-hidden">
+                        <img src={customLogo} alt="Logo" className="w-full h-full object-contain" />
+                      </div>
+                    ) : (
+                      <div className="w-8 h-8 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center">
+                        <Tv className="w-4 h-4 text-primary-foreground" />
+                      </div>
+                    )}
+                    <span className="text-lg font-bold text-foreground">IPPL4Y</span>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
     </div>
@@ -756,4 +922,3 @@ const SuperadminDashboard = () => {
 };
 
 export default SuperadminDashboard;
-
