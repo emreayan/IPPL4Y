@@ -135,6 +135,36 @@ backend:
         agent: "testing"
         comment: "Comprehensive Logo Management API testing completed successfully. All 9 test cases passed (12/12 total including health check). ✅ Complete flow tested: Initial GET (no logo) → POST upload (287 bytes PNG) → GET after upload (has_custom_logo: true) → File download (image/png, 287 bytes) → DELETE logo → GET after delete (has_custom_logo: false) → File 404 after delete. ✅ Error handling tested: Invalid format (.txt) correctly rejected with proper Turkish error message. Large file (3MB) correctly rejected with size limit error. ✅ All response formats match specification exactly. ✅ File storage and cleanup working properly. ✅ MongoDB metadata integration working. Backend logs show no errors. Logo Management API is fully functional and ready for production use."
 
+  - task: "Device Management API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Device & Playlist Management sistemi eklendi. Backend: /api/device/register, /api/device/{device_id}/playlists, /api/device/{device_id}/playlist endpoints. Frontend: DeviceSetup.jsx sayfası, Navigation'da playlist dropdown. Maks 10 playlist/cihaz. M3U ve Xtream Codes (DNS) destekleniyor."
+      - working: true
+        agent: "testing"
+        comment: "Comprehensive Device Management API testing completed successfully. ✅ POST /api/device/register tested with device_id=11:30:02:28:02:bb, device_key=1323008583 - correctly registered/updated device with proper response format {success, message, device}. ✅ POST /api/device/validate tested - correctly validated existing device credentials and returned {valid: true, message, device}. ✅ Validation testing: Invalid device_id format (non-MAC) and invalid device_key format (non-numeric) both correctly rejected with 400 status. ✅ All response formats match specification exactly. ✅ Device status management working (registered → active). Backend logs show successful device operations with no errors."
+
+  - task: "Playlist Management API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Device & Playlist Management sistemi eklendi. Backend: /api/device/register, /api/device/{device_id}/playlists, /api/device/{device_id}/playlist endpoints. Frontend: DeviceSetup.jsx sayfası, Navigation'da playlist dropdown. Maks 10 playlist/cihaz. M3U ve Xtream Codes (DNS) destekleniyor."
+      - working: true
+        agent: "testing"
+        comment: "Comprehensive Playlist Management API testing completed successfully. ✅ POST /api/device/{device_id}/playlist tested for both M3U and Xtream types - correctly added playlists with proper response format {success, message, playlist}. ✅ M3U playlist: 'Test M3U Playlist' with http://test.com/playlist.m3u successfully added. ✅ Xtream playlist: 'Test Xtream Playlist' with credentials (username/password) successfully added, password correctly masked in response (***). ✅ GET /api/device/{device_id}/playlists tested - correctly returned {device_id, device_status, playlists[], active_playlist} with 4 playlists including existing ones. ✅ PUT /api/device/{device_id}/playlist/{playlist_id}/active tested - successfully changed active playlist with proper response {success, message, active_playlist_id}. ✅ DELETE /api/device/{device_id}/playlist/{playlist_id} tested - successfully deleted playlist with proper response {success, message}. ✅ Validation testing: Xtream without credentials correctly rejected with proper Turkish error message. ✅ Playlist limit testing: Maximum 10 playlists per device correctly enforced with proper error message. ✅ All response formats match specification exactly. Backend logs show successful playlist operations with no errors."
+
 frontend:
   - task: "Superadmin Dashboard URL Health Check UI"
     implemented: true
