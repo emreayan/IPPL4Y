@@ -180,7 +180,6 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Logo Management API Endpoints"
     - "Logo Management UI in Superadmin Dashboard"
     - "Dynamic Logo Display"
   stuck_tasks: []
