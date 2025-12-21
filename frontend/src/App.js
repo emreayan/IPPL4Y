@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppProvider, useApp } from "./context/AppContext";
 import Login from "./components/Login";
 import IptvSetup from "./components/IptvSetup";
+import DeviceSetup from "./components/DeviceSetup";
 import Home from "./components/Home";
 import Player from "./components/Player";
 import BouquetSettings from "./components/BouquetSettings";
@@ -25,6 +26,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <IptvSetup />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/device-setup"
+          element={
+            <ProtectedRoute>
+              <DeviceSetup />
             </ProtectedRoute>
           }
         />
