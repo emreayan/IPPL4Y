@@ -24,9 +24,10 @@ import {
   DialogTitle,
 } from './ui/dialog';
 import { ScrollArea } from './ui/scroll-area';
+import LiveTVContent from './LiveTVContent';
 
 const MainLayout = () => {
-  const { user, theme, changeTheme, logout, iptvConnected, iptvService, toggleFavorite, isFavorite, channelVisibility } = useApp();
+  const { user, theme, changeTheme, logout, iptvConnected, iptvService, toggleFavorite, isFavorite, channelVisibility, activePlaylist } = useApp();
   const navigate = useNavigate();
   const [currentSection, setCurrentSection] = useState('live'); // live, series, movies, favorites
   const [selectedCategory, setSelectedCategory] = useState(null);
