@@ -227,8 +227,8 @@ const MainLayout = () => {
 
       {/* Main Content Area */}
       <div className="flex-1 flex">
-        {/* Left Sidebar - Categories */}
-        {currentSection !== 'favorites' && (
+        {/* Left Sidebar - Categories (hide when activePlaylist exists and in live section) */}
+        {currentSection !== 'favorites' && !(currentSection === 'live' && activePlaylist) && (
           <div className="w-64 border-r border-border bg-card">
             <ScrollArea className="h-[calc(100vh-4rem)]">
               <div className="p-4">
