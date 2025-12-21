@@ -95,9 +95,27 @@ const Login = () => {
     <div className="min-h-screen bg-gradient-to-br from-[hsl(214,32%,8%)] via-[hsl(214,28%,12%)] to-[hsl(214,32%,8%)] flex items-center justify-center p-4">
       <Card className="w-full max-w-md bg-card/50 border-border backdrop-blur-xl">
         <CardHeader className="space-y-4 text-center">
-          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20">
-            <Tv className="w-8 h-8 text-primary-foreground" />
-          </div>
+          {/* Dynamic Logo */}
+          {customLogo ? (
+            <div className="mx-auto w-16 h-16 rounded-2xl overflow-hidden shadow-lg shadow-primary/20">
+              <img 
+                src={customLogo} 
+                alt="IPPL4Y Logo" 
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'flex';
+                }}
+              />
+              <div className="hidden w-full h-full bg-gradient-to-br from-primary to-accent items-center justify-center">
+                <Tv className="w-8 h-8 text-primary-foreground" />
+              </div>
+            </div>
+          ) : (
+            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20">
+              <Tv className="w-8 h-8 text-primary-foreground" />
+            </div>
+          )}
           <CardTitle className="text-3xl font-bold text-foreground">IPPL4Y</CardTitle>
           <CardDescription className="text-muted-foreground">
             Hesap tipinizi seçin ve giriş yapın
