@@ -1,7 +1,10 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { ippl4yUsers, iptvServiceCredentials } from '../authData';
+import axios from 'axios';
 
 const AppContext = createContext();
+
+const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 export const useApp = () => {
   const context = useContext(AppContext);
@@ -21,6 +24,32 @@ export const AppProvider = ({ children }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [theme, setTheme] = useState('ippl4y-prime');
   const [channelVisibility, setChannelVisibility] = useState({});
+  const [customLogo, setCustomLogo] = useState(null);
+  const [logoLoading, setLogoLoading] = useState(true);
+
+  // Fetch logo from API
+  const fetchLogo = useCallback(async () => {
+    try {
+      setLogoLoading(true);
+      const response = await axios.get(`${API_URL}/api/admin/logo`);
+      if (response.data.has_custom_logo) {
+        // Add timestamp to prevent caching
+        setCustomLogo(`${API_URL}/api/admin/logo/file?t=${Date.now()}`);
+      } else {
+        setCustomLogo(null);
+      }
+    } catch (error) {
+      console.error('Failed to fetch logo:', error);
+      setCustomLogo(null);
+    } finally {
+      setLogoLoading(false);
+    }
+  }, []);
+
+  // Refresh logo (called after upload/delete)
+  const refreshLogo = useCallback(() => {
+    fetchLogo();
+  }, [fetchLogo]);
 
   useEffect(() => {
     // Check if user is already logged in
