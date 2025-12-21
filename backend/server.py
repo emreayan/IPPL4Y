@@ -39,6 +39,25 @@ class StatusCheck(BaseModel):
 class StatusCheckCreate(BaseModel):
     client_name: str
 
+# URL Health Check Models
+class UrlHealthCheckRequest(BaseModel):
+    urls: List[str]
+
+class UrlHealthResult(BaseModel):
+    url: str
+    status: str  # 'online', 'offline', 'slow'
+    response_time_ms: int
+    status_code: Optional[int] = None
+    error: Optional[str] = None
+    checked_at: str
+
+class UrlHealthCheckResponse(BaseModel):
+    results: List[UrlHealthResult]
+    total: int
+    online: int
+    offline: int
+    slow: int
+
 # Add your routes to the router instead of directly to app
 @api_router.get("/")
 async def root():
