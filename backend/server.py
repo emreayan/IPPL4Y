@@ -867,7 +867,7 @@ def group_channels_by_category(channels: List[Dict[str, Any]]) -> List[Dict[str,
 async def parse_playlist(playlist_id: str, limit: Optional[int] = None):
     """Parse a playlist and return channel list grouped by category"""
     
-    # Find playlist in database
+    # Find playlist in database (include password for xtream)
     playlist = await db.playlists.find_one({"id": playlist_id}, {"_id": 0})
     
     if not playlist:
@@ -879,20 +879,78 @@ async def parse_playlist(playlist_id: str, limit: Optional[int] = None):
     
     try:
         if playlist_type == 'xtream':
-            # For Xtream Codes, construct the M3U URL
+            # For Xtream Codes, use the Xtream API directly
             username = playlist.get('xtream_username')
             password = playlist.get('xtream_password')
             
             if not username or not password:
                 raise HTTPException(status_code=400, detail="Xtream credentials eksik")
             
-            # Construct M3U URL from Xtream server
             base_url = playlist_url.rstrip('/')
-            m3u_url = f"{base_url}/get.php?username={username}&password={password}&type=m3u_plus&output=mpegts"
+            
+            # Use Xtream API instead of M3U for better performance
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                # Get live categories
+                cat_url = f"{base_url}/player_api.php?username={username}&password={password}&action=get_live_categories"
+                cat_response = await client.get(cat_url, headers=XTREAM_HEADERS)
+                categories_raw = cat_response.json() if cat_response.status_code == 200 else []
+                
+                # Get live streams
+                streams_url = f"{base_url}/player_api.php?username={username}&password={password}&action=get_live_streams"
+                streams_response = await client.get(streams_url, headers=XTREAM_HEADERS)
+                streams_raw = streams_response.json() if streams_response.status_code == 200 else []
+            
+            # Create category lookup
+            category_lookup = {str(c.get('category_id')): c.get('category_name', 'Uncategorized') for c in categories_raw}
+            
+            # Group streams by category
+            categories_dict = {}
+            
+            for stream in streams_raw:
+                cat_id = str(stream.get('category_id', ''))
+                cat_name = category_lookup.get(cat_id, 'Uncategorized')
+                
+                # Skip adult content
+                if any(x in cat_name.lower() for x in ['adult', 'porno', '+18', 'xxx']):
+                    continue
+                
+                if cat_name not in categories_dict:
+                    categories_dict[cat_name] = {
+                        "id": cat_id,
+                        "name": cat_name,
+                        "channels": []
+                    }
+                
+                categories_dict[cat_name]["channels"].append({
+                    "id": str(stream.get('stream_id', '')),
+                    "name": stream.get('name', 'Unknown'),
+                    "logo": stream.get('stream_icon', ''),
+                    "group": cat_name,
+                    "stream_url": f"{base_url}/live/{username}/{password}/{stream.get('stream_id')}.m3u8",
+                    "epg_channel_id": stream.get('epg_channel_id'),
+                    "tvg_id": stream.get('epg_channel_id'),
+                    "tvg_name": stream.get('name')
+                })
+            
+            # Sort categories
+            sorted_categories = sorted(categories_dict.values(), key=lambda x: x['name'])
+            total_channels = sum(len(c['channels']) for c in sorted_categories)
+            
+            logger.info(f"Parsed {total_channels} channels from Xtream playlist")
+            
+            return {
+                "success": True,
+                "playlist_name": playlist_name,
+                "playlist_type": playlist_type,
+                "total_channels": total_channels,
+                "categories": sorted_categories,
+                "error": None
+            }
         else:
+            # M3U parsing - use direct URL fetch
             m3u_url = playlist_url
         
-        logger.info(f"Fetching playlist from: {m3u_url[:50]}...")
+            logger.info(f"Fetching playlist from: {m3u_url[:50]}...")
         
         # Fetch the M3U content with proper headers to bypass CDN restrictions
         headers = {
