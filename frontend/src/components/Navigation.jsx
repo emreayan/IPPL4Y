@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { Tv, Heart, Settings as SettingsIcon, LogOut, Palette, Shield, Wifi, WifiOff } from 'lucide-react';
+import { Tv, Heart, Settings as SettingsIcon, LogOut, Palette, Shield, Wifi, WifiOff, List, ChevronDown, Check, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -14,12 +14,29 @@ import {
 } from './ui/dropdown-menu';
 
 const Navigation = () => {
-  const { currentTab, setCurrentTab, logout, user, theme, changeTheme, iptvConnected, iptvService, customLogo } = useApp();
+  const { 
+    currentTab, 
+    setCurrentTab, 
+    logout, 
+    user, 
+    theme, 
+    changeTheme, 
+    iptvConnected, 
+    iptvService, 
+    customLogo,
+    // Playlist features
+    playlists,
+    activePlaylist,
+    deviceInfo,
+    switchPlaylist,
+    playlistsLoading
+  } = useApp();
   const navigate = useNavigate();
+  const [switchingPlaylist, setSwitchingPlaylist] = useState(false);
 
   const tabs = [
-    { id: 'live', label: 'Live TV', icon: Tv },
-    { id: 'favorites', label: 'Favorites', icon: Heart },
+    { id: 'live', label: 'Canlı', icon: Tv },
+    { id: 'favorites', label: 'Favoriler', icon: Heart },
   ];
 
   const handleLogout = () => {
@@ -34,6 +51,17 @@ const Navigation = () => {
       navigate('/superadmin');
     } else {
       navigate('/bouquet-settings');
+    }
+  };
+
+  const handlePlaylistSwitch = async (playlist) => {
+    if (!deviceInfo?.device_id || playlist.id === activePlaylist?.id) return;
+    
+    setSwitchingPlaylist(true);
+    try {
+      await switchPlaylist(deviceInfo.device_id, playlist.id);
+    } finally {
+      setSwitchingPlaylist(false);
     }
   };
 
@@ -110,11 +138,68 @@ const Navigation = () => {
           </div>
 
           <div className="flex items-center space-x-2">
-            {/* IPTV Service Info (for users) */}
-            {user?.role === 'user' && iptvService && (
-              <Badge variant="outline" className="border-primary/50 text-primary">
-                {iptvService.provider.replace('provider_', '')}
-              </Badge>
+            {/* Playlist Selector (for users with multiple playlists) */}
+            {user?.role === 'user' && playlists.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-primary/50 text-foreground hover:bg-primary/10 flex items-center space-x-2"
+                    disabled={switchingPlaylist || playlistsLoading}
+                  >
+                    {switchingPlaylist || playlistsLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <List className="w-4 h-4" />
+                    )}
+                    <span className="hidden sm:inline max-w-[120px] truncate">
+                      {activePlaylist?.playlist_name || 'Playlist Seç'}
+                    </span>
+                    <ChevronDown className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="bg-card border-border min-w-[200px]">
+                  <DropdownMenuLabel className="text-foreground flex items-center justify-between">
+                    <span>Playlistler</span>
+                    <Badge variant="outline" className="text-xs">
+                      {playlists.length}/10
+                    </Badge>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator className="bg-border" />
+                  {playlists.map((playlist) => (
+                    <DropdownMenuItem
+                      key={playlist.id}
+                      onClick={() => handlePlaylistSwitch(playlist)}
+                      className={`flex items-center justify-between cursor-pointer ${
+                        playlist.id === activePlaylist?.id ? 'bg-primary/10' : ''
+                      }`}
+                    >
+                      <div className="flex flex-col">
+                        <span className="text-foreground">{playlist.playlist_name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {playlist.playlist_type === 'xtream' ? 'Xtream Codes' : 'M3U'}
+                        </span>
+                      </div>
+                      {playlist.id === activePlaylist?.id && (
+                        <Check className="w-4 h-4 text-primary" />
+                      )}
+                    </DropdownMenuItem>
+                  ))}
+                  {playlists.length === 0 && (
+                    <div className="px-2 py-3 text-center text-sm text-muted-foreground">
+                      Henüz playlist eklenmemiş
+                    </div>
+                  )}
+                  <DropdownMenuSeparator className="bg-border" />
+                  <DropdownMenuItem
+                    onClick={() => navigate('/device-setup')}
+                    className="text-primary cursor-pointer"
+                  >
+                    + Playlist Yönetimi
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
 
             {/* Theme Switcher */}
