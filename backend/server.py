@@ -387,6 +387,356 @@ async def delete_logo():
         "message": "Logo silindi, varsayılan logo kullanılacak"
     }
 
+
+# ==================== DEVICE MANAGEMENT ENDPOINTS ====================
+
+def validate_device_id(device_id: str) -> bool:
+    """Validate device ID format (MAC-like: XX:XX:XX:XX:XX:XX)"""
+    import re
+    pattern = r'^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$'
+    return bool(re.match(pattern, device_id))
+
+
+def validate_device_key(device_key: str) -> bool:
+    """Validate device key format (numeric)"""
+    return device_key.isdigit() and len(device_key) >= 6
+
+
+@api_router.post("/device/register")
+async def register_device(request: DeviceRegisterRequest):
+    """Register a new device or update existing one"""
+    # Validate formats
+    if not validate_device_id(request.device_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Geçersiz Device ID formatı. Örnek: 11:30:02:28:02:bb"
+        )
+    
+    if not validate_device_key(request.device_key):
+        raise HTTPException(
+            status_code=400,
+            detail="Geçersiz Device Key formatı. Örnek: 1323008583"
+        )
+    
+    now = datetime.now(timezone.utc).isoformat()
+    
+    # Check if device already exists
+    existing_device = await db.devices.find_one({"device_id": request.device_id}, {"_id": 0})
+    
+    if existing_device:
+        # Verify device key matches
+        if existing_device.get("device_key") != request.device_key:
+            raise HTTPException(
+                status_code=403,
+                detail="Device Key eşleşmiyor"
+            )
+        
+        # Update last seen
+        await db.devices.update_one(
+            {"device_id": request.device_id},
+            {"$set": {"last_seen_at": now}}
+        )
+        
+        return {
+            "success": True,
+            "message": "Cihaz zaten kayıtlı",
+            "device": {
+                **existing_device,
+                "last_seen_at": now
+            }
+        }
+    
+    # Create new device
+    device_doc = {
+        "device_id": request.device_id,
+        "device_key": request.device_key,
+        "platform": request.platform,
+        "status": "registered",
+        "created_at": now,
+        "last_seen_at": now
+    }
+    
+    await db.devices.insert_one(device_doc)
+    del device_doc["_id"]
+    
+    logger.info(f"Device registered: {request.device_id}")
+    
+    return {
+        "success": True,
+        "message": "Cihaz başarıyla kaydedildi",
+        "device": device_doc
+    }
+
+
+@api_router.post("/device/validate")
+async def validate_device(request: DeviceRegisterRequest):
+    """Validate device credentials without registering"""
+    # Validate formats
+    if not validate_device_id(request.device_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Geçersiz Device ID formatı"
+        )
+    
+    if not validate_device_key(request.device_key):
+        raise HTTPException(
+            status_code=400,
+            detail="Geçersiz Device Key formatı"
+        )
+    
+    # Check device exists and key matches
+    device = await db.devices.find_one({"device_id": request.device_id}, {"_id": 0})
+    
+    if not device:
+        return {"valid": False, "message": "Cihaz bulunamadı"}
+    
+    if device.get("device_key") != request.device_key:
+        return {"valid": False, "message": "Device Key eşleşmiyor"}
+    
+    return {
+        "valid": True,
+        "message": "Cihaz doğrulandı",
+        "device": device
+    }
+
+
+@api_router.get("/device/{device_id}")
+async def get_device(device_id: str):
+    """Get device information"""
+    device = await db.devices.find_one({"device_id": device_id}, {"_id": 0})
+    
+    if not device:
+        raise HTTPException(status_code=404, detail="Cihaz bulunamadı")
+    
+    return device
+
+
+@api_router.get("/device/{device_id}/playlists")
+async def get_device_playlists(device_id: str, device_key: Optional[str] = None):
+    """Get all playlists for a device"""
+    # Check device exists
+    device = await db.devices.find_one({"device_id": device_id}, {"_id": 0})
+    
+    if not device:
+        raise HTTPException(status_code=404, detail="Cihaz bulunamadı")
+    
+    # Optional: Validate device key if provided
+    if device_key and device.get("device_key") != device_key:
+        raise HTTPException(status_code=403, detail="Device Key eşleşmiyor")
+    
+    # Update last seen
+    await db.devices.update_one(
+        {"device_id": device_id},
+        {"$set": {"last_seen_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    # Get playlists
+    playlists = await db.playlists.find(
+        {"device_id": device_id},
+        {"_id": 0}
+    ).to_list(MAX_PLAYLISTS_PER_DEVICE)
+    
+    # Find active playlist
+    active_playlist = next((p for p in playlists if p.get("is_active")), None)
+    
+    return {
+        "device_id": device_id,
+        "device_status": device.get("status"),
+        "playlists": playlists,
+        "active_playlist": active_playlist
+    }
+
+
+@api_router.post("/device/{device_id}/playlist")
+async def add_playlist(device_id: str, request: PlaylistCreateRequest, device_key: Optional[str] = None):
+    """Add a playlist to a device (max 10)"""
+    # Check device exists
+    device = await db.devices.find_one({"device_id": device_id}, {"_id": 0})
+    
+    if not device:
+        raise HTTPException(status_code=404, detail="Cihaz bulunamadı")
+    
+    # Validate device key if provided
+    if device_key and device.get("device_key") != device_key:
+        raise HTTPException(status_code=403, detail="Device Key eşleşmiyor")
+    
+    # Check playlist limit
+    playlist_count = await db.playlists.count_documents({"device_id": device_id})
+    if playlist_count >= MAX_PLAYLISTS_PER_DEVICE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Maksimum playlist sayısına ulaşıldı ({MAX_PLAYLISTS_PER_DEVICE})"
+        )
+    
+    # Validate playlist type
+    if request.playlist_type not in ["m3u", "xtream"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Geçersiz playlist türü. 'm3u' veya 'xtream' olmalı"
+        )
+    
+    # For xtream type, username and password are required
+    if request.playlist_type == "xtream":
+        if not request.xtream_username or not request.xtream_password:
+            raise HTTPException(
+                status_code=400,
+                detail="Xtream türü için kullanıcı adı ve şifre gerekli"
+            )
+    
+    now = datetime.now(timezone.utc).isoformat()
+    playlist_id = str(uuid.uuid4())
+    
+    # First playlist is automatically active
+    is_first = playlist_count == 0
+    
+    playlist_doc = {
+        "id": playlist_id,
+        "device_id": device_id,
+        "playlist_name": request.playlist_name,
+        "playlist_url": request.playlist_url,
+        "playlist_type": request.playlist_type,
+        "xtream_username": request.xtream_username if request.playlist_type == "xtream" else None,
+        "xtream_password": request.xtream_password if request.playlist_type == "xtream" else None,
+        "is_active": is_first,
+        "created_at": now
+    }
+    
+    await db.playlists.insert_one(playlist_doc)
+    
+    # Update device status to active if first playlist
+    if is_first:
+        await db.devices.update_one(
+            {"device_id": device_id},
+            {"$set": {"status": "active"}}
+        )
+    
+    logger.info(f"Playlist added to device {device_id}: {request.playlist_name}")
+    
+    # Don't return password in response
+    del playlist_doc["_id"]
+    if playlist_doc.get("xtream_password"):
+        playlist_doc["xtream_password"] = "***"
+    
+    return {
+        "success": True,
+        "message": "Playlist eklendi",
+        "playlist": playlist_doc
+    }
+
+
+@api_router.put("/device/{device_id}/playlist/{playlist_id}")
+async def update_playlist(device_id: str, playlist_id: str, request: PlaylistUpdateRequest):
+    """Update a playlist"""
+    # Check playlist exists
+    playlist = await db.playlists.find_one(
+        {"id": playlist_id, "device_id": device_id},
+        {"_id": 0}
+    )
+    
+    if not playlist:
+        raise HTTPException(status_code=404, detail="Playlist bulunamadı")
+    
+    # Build update document
+    update_doc = {}
+    if request.playlist_name is not None:
+        update_doc["playlist_name"] = request.playlist_name
+    if request.playlist_url is not None:
+        update_doc["playlist_url"] = request.playlist_url
+    if request.playlist_type is not None:
+        update_doc["playlist_type"] = request.playlist_type
+    if request.xtream_username is not None:
+        update_doc["xtream_username"] = request.xtream_username
+    if request.xtream_password is not None:
+        update_doc["xtream_password"] = request.xtream_password
+    
+    if not update_doc:
+        raise HTTPException(status_code=400, detail="Güncellenecek alan belirtilmedi")
+    
+    await db.playlists.update_one(
+        {"id": playlist_id, "device_id": device_id},
+        {"$set": update_doc}
+    )
+    
+    logger.info(f"Playlist updated: {playlist_id}")
+    
+    return {
+        "success": True,
+        "message": "Playlist güncellendi"
+    }
+
+
+@api_router.delete("/device/{device_id}/playlist/{playlist_id}")
+async def delete_playlist(device_id: str, playlist_id: str):
+    """Delete a playlist"""
+    # Check playlist exists
+    playlist = await db.playlists.find_one(
+        {"id": playlist_id, "device_id": device_id},
+        {"_id": 0}
+    )
+    
+    if not playlist:
+        raise HTTPException(status_code=404, detail="Playlist bulunamadı")
+    
+    was_active = playlist.get("is_active", False)
+    
+    # Delete playlist
+    await db.playlists.delete_one({"id": playlist_id, "device_id": device_id})
+    
+    # If deleted playlist was active, make another one active
+    if was_active:
+        remaining = await db.playlists.find_one({"device_id": device_id}, {"_id": 0})
+        if remaining:
+            await db.playlists.update_one(
+                {"id": remaining["id"]},
+                {"$set": {"is_active": True}}
+            )
+        else:
+            # No playlists left, update device status
+            await db.devices.update_one(
+                {"device_id": device_id},
+                {"$set": {"status": "registered"}}
+            )
+    
+    logger.info(f"Playlist deleted: {playlist_id}")
+    
+    return {
+        "success": True,
+        "message": "Playlist silindi"
+    }
+
+
+@api_router.put("/device/{device_id}/playlist/{playlist_id}/active")
+async def set_active_playlist(device_id: str, playlist_id: str):
+    """Set a playlist as active"""
+    # Check playlist exists
+    playlist = await db.playlists.find_one(
+        {"id": playlist_id, "device_id": device_id},
+        {"_id": 0}
+    )
+    
+    if not playlist:
+        raise HTTPException(status_code=404, detail="Playlist bulunamadı")
+    
+    # Deactivate all playlists for this device
+    await db.playlists.update_many(
+        {"device_id": device_id},
+        {"$set": {"is_active": False}}
+    )
+    
+    # Activate the selected playlist
+    await db.playlists.update_one(
+        {"id": playlist_id, "device_id": device_id},
+        {"$set": {"is_active": True}}
+    )
+    
+    logger.info(f"Active playlist changed for device {device_id}: {playlist_id}")
+    
+    return {
+        "success": True,
+        "message": "Aktif playlist değiştirildi",
+        "active_playlist_id": playlist_id
+    }
+
 # Include the router in the main app
 app.include_router(api_router)
 
