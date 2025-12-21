@@ -9,13 +9,15 @@ import { Button } from './ui/button';
 
 const LiveTV = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [viewMode, setViewMode] = useState('grid');
-  const { toggleFavorite, isFavorite } = useApp();
+  const { toggleFavorite, isFavorite, isChannelVisible } = useApp();
   const navigate = useNavigate();
 
-  const filteredChannels = selectedCategory === 'All'
-    ? mockChannels
-    : mockChannels.filter(channel => channel.category === selectedCategory);
+  // Filter channels by category and visibility
+  const filteredChannels = mockChannels.filter(channel => {
+    const matchesCategory = selectedCategory === 'All' || channel.category === selectedCategory;
+    const isVisible = isChannelVisible(channel.id);
+    return matchesCategory && isVisible;
+  });
 
   const handlePlay = (channel) => {
     navigate('/player', { state: { content: channel, type: 'channel' } });
@@ -32,8 +34,8 @@ const LiveTV = () => {
             variant={selectedCategory === category ? 'default' : 'outline'}
             className={`whitespace-nowrap transition-all duration-200 ${
               selectedCategory === category
-                ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white'
+                ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/30'
+                : 'bg-card border-border text-muted-foreground hover:bg-secondary hover:text-foreground'
             }`}
           >
             {category}
@@ -46,18 +48,18 @@ const LiveTV = () => {
         {filteredChannels.map((channel) => (
           <Card
             key={channel.id}
-            className="bg-slate-800/50 border-slate-700 hover:border-purple-500 transition-all duration-300 overflow-hidden group cursor-pointer"
+            className="bg-card/50 border-border hover:border-primary transition-all duration-300 overflow-hidden group cursor-pointer hover:shadow-lg hover:shadow-primary/20"
             onClick={() => handlePlay(channel)}
           >
-            <div className="relative aspect-video bg-slate-900">
+            <div className="relative aspect-video bg-secondary">
               <img
                 src={channel.logo}
                 alt={channel.name}
                 className="w-full h-full object-cover"
               />
               <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                <div className="w-16 h-16 rounded-full bg-purple-600 flex items-center justify-center transform group-hover:scale-110 transition-transform duration-300">
-                  <Play className="w-8 h-8 text-white" fill="white" />
+                <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center transform group-hover:scale-110 transition-transform duration-300 shadow-lg shadow-primary/50">
+                  <Play className="w-8 h-8 text-primary-foreground" fill="currentColor" />
                 </div>
               </div>
               <button
@@ -65,13 +67,13 @@ const LiveTV = () => {
                   e.stopPropagation();
                   toggleFavorite(channel, 'channel');
                 }}
-                className="absolute top-2 right-2 w-8 h-8 rounded-full bg-slate-900/80 flex items-center justify-center hover:bg-slate-800 transition-all duration-200"
+                className="absolute top-2 right-2 w-8 h-8 rounded-full bg-card/80 backdrop-blur-sm flex items-center justify-center hover:bg-card transition-all duration-200"
               >
                 <Heart
                   className={`w-4 h-4 ${
                     isFavorite(channel.id, 'channel')
-                      ? 'fill-pink-500 text-pink-500'
-                      : 'text-white'
+                      ? 'fill-accent text-accent'
+                      : 'text-foreground'
                   }`}
                 />
               </button>
@@ -80,16 +82,16 @@ const LiveTV = () => {
               </Badge>
             </div>
             <div className="p-4">
-              <h3 className="font-semibold text-white mb-2">{channel.name}</h3>
-              <p className="text-sm text-slate-400 mb-2">{channel.category}</p>
+              <h3 className="font-semibold text-foreground mb-2">{channel.name}</h3>
+              <p className="text-sm text-muted-foreground mb-2">{channel.category}</p>
               {channel.epg && (
                 <div className="space-y-1">
-                  <div className="text-xs text-slate-300">
-                    <span className="text-purple-400">Now: </span>
+                  <div className="text-xs text-foreground">
+                    <span className="text-primary">Now: </span>
                     {channel.epg.current.title}
                   </div>
-                  <div className="text-xs text-slate-500">
-                    <span className="text-slate-400">Next: </span>
+                  <div className="text-xs text-muted-foreground">
+                    <span>Next: </span>
                     {channel.epg.next.title}
                   </div>
                 </div>
@@ -98,6 +100,13 @@ const LiveTV = () => {
           </Card>
         ))}
       </div>
+
+      {filteredChannels.length === 0 && (
+        <div className="text-center py-20">
+          <p className="text-muted-foreground">No visible channels in this category</p>
+          <p className="text-sm text-muted-foreground mt-2">Check Bouquet Settings to manage channel visibility</p>
+        </div>
+      )}
     </div>
   );
 };
