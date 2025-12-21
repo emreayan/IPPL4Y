@@ -229,7 +229,10 @@ export const AppProvider = ({ children }) => {
         changeTheme,
         channelVisibility,
         toggleChannelVisibility,
-        isChannelVisible
+        isChannelVisible,
+        customLogo,
+        logoLoading,
+        refreshLogo
       }}
     >
       {children}
