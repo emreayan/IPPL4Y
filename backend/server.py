@@ -989,8 +989,12 @@ async def parse_playlist_url(url: str, playlist_type: str = "m3u", xtream_userna
         
         logger.info(f"Direct parsing playlist from: {m3u_url[:50]}...")
         
+        headers = {
+            'User-Agent': 'IPPL4Y/1.0 (IPTV Player)',
+            'Accept': '*/*'
+        }
         async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
-            response = await client.get(m3u_url)
+            response = await client.get(m3u_url, headers=headers)
             response.raise_for_status()
             content = response.text
         
