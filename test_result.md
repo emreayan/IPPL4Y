@@ -120,6 +120,18 @@ backend:
         agent: "testing"
         comment: "Comprehensive backend API testing completed successfully. POST /api/health-check tested with ['https://google.com', 'https://httpbin.org/status/200', 'http://invalid-url-test.xyz'] - correctly returned online/offline statuses. GET /api/health-check/single tested with valid URL - returned proper response format. Invalid URL handling tested - correctly marked as offline with error message. All response formats match specification: {results, total, online, offline, slow} for POST and {url, status, response_time_ms, status_code, error, checked_at} for GET. Backend logs show no errors. All 3 test cases passed."
 
+  - task: "Logo Management API Endpoints"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Logo yönetim API'leri oluşturuldu: POST /api/admin/logo (yükleme), GET /api/admin/logo (bilgi), GET /api/admin/logo/file (dosya), DELETE /api/admin/logo (silme). Dosya boyutu 2MB sınırı, PNG/JPG/SVG formatları destekleniyor. MongoDB'de metadata saklanıyor, dosya uploads/ klasöründe."
+
 frontend:
   - task: "Superadmin Dashboard URL Health Check UI"
     implemented: true
@@ -132,6 +144,30 @@ frontend:
       - working: true
         agent: "main"
         comment: "SuperadminDashboard.jsx düzeltildi (duplikasyon kaldırıldı). Gerçek backend API'ye bağlandı. axios ile /api/health-check çağrılıyor. Online/Offline/Slow/Checking durumları gösteriliyor. Sayfa yüklendiğinde otomatik kontrol yapılıyor."
+
+  - task: "Logo Management UI in Superadmin Dashboard"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/components/SuperadminDashboard.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Logo Yönetimi tab'ı Superadmin dashboard'a eklendi. Mevcut logo önizleme, yeni logo yükleme, logo silme özellikleri. Login ve Navigation önizlemeleri."
+
+  - task: "Dynamic Logo Display"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/components/Login.jsx, /app/frontend/src/components/Navigation.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Login ve Navigation component'leri dinamik logo gösteriyor. AppContext'e customLogo state eklendi. Logo yoksa varsayılan TV ikonu gösteriliyor."
 
 metadata:
   created_by: "main_agent"
