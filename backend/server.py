@@ -894,9 +894,13 @@ async def parse_playlist(playlist_id: str, limit: Optional[int] = None):
         
         logger.info(f"Fetching playlist from: {m3u_url[:50]}...")
         
-        # Fetch the M3U content
+        # Fetch the M3U content with proper headers
+        headers = {
+            'User-Agent': 'IPPL4Y/1.0 (IPTV Player)',
+            'Accept': '*/*'
+        }
         async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
-            response = await client.get(m3u_url)
+            response = await client.get(m3u_url, headers=headers)
             response.raise_for_status()
             content = response.text
         
