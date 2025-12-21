@@ -59,13 +59,18 @@ const Navigation = () => {
                 <button
                   key={tab.id}
                   onClick={() => setCurrentTab(tab.id)}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${\n                    currentTab === tab.id\n                      ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30'\n                      : 'text-muted-foreground hover:bg-secondary hover:text-foreground'\n                  }`}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${
+                    currentTab === tab.id
+                      ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30'
+                      : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+                  }`}
                 >
                   <Icon className="w-5 h-5" />
                   <span className="hidden md:inline">{tab.label}</span>
                 </button>
               );
-            })}\n          </div>
+            })}
+          </div>
 
           <div className="flex items-center space-x-2">
             {/* Theme Switcher */}
