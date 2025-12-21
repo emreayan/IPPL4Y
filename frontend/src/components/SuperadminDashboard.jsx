@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ippl4yUsers, iptvServiceCredentials } from '../authData';
 import { Card } from './ui/card';
@@ -8,6 +8,9 @@ import { Badge } from './ui/badge';
 import { ArrowLeft, Users, Building2, Search, Calendar, Mail, Shield, TrendingUp, DollarSign, Activity, CheckCircle, XCircle, AlertTriangle, RefreshCw, Globe } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Alert, AlertDescription } from './ui/alert';
+import axios from 'axios';
+
+const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const SuperadminDashboard = () => {
   const navigate = useNavigate();
@@ -18,9 +21,9 @@ const SuperadminDashboard = () => {
       provider: 'provider_turktelekom',
       companyName: 'Türk Telekom IPTV',
       url: 'http://turktelekom-iptv.com/playlist.m3u',
-      status: 'online',
-      responseTime: 245,
-      lastChecked: '2 dakika önce',
+      status: 'checking',
+      responseTime: 0,
+      lastChecked: 'Henüz kontrol edilmedi',
       customerCount: 1,
       channelCount: 250
     },
@@ -28,9 +31,9 @@ const SuperadminDashboard = () => {
       provider: 'provider_digiturk',
       companyName: 'Digiturk IPTV Service',
       url: 'http://digiturk.com/streams/playlist.m3u',
-      status: 'online',
-      responseTime: 189,
-      lastChecked: '5 dakika önce',
+      status: 'checking',
+      responseTime: 0,
+      lastChecked: 'Henüz kontrol edilmedi',
       customerCount: 1,
       channelCount: 180
     }
