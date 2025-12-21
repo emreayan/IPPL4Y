@@ -14,7 +14,7 @@ import {
 } from './ui/dropdown-menu';
 
 const Navigation = () => {
-  const { currentTab, setCurrentTab, logout, user, theme, changeTheme, iptvConnected, iptvService } = useApp();
+  const { currentTab, setCurrentTab, logout, user, theme, changeTheme, iptvConnected, iptvService, customLogo } = useApp();
   const navigate = useNavigate();
 
   const tabs = [
