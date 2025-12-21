@@ -70,6 +70,12 @@ class UrlHealthCheckResponse(BaseModel):
     offline: int
     slow: int
 
+# Logo Response Model
+class LogoResponse(BaseModel):
+    has_custom_logo: bool
+    logo_url: Optional[str] = None
+    uploaded_at: Optional[str] = None
+
 # Add your routes to the router instead of directly to app
 @api_router.get("/")
 async def root():
