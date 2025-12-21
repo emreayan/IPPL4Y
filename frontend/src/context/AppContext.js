@@ -156,6 +156,14 @@ export const AppProvider = ({ children }) => {
       );
       
       if (response.data.success) {
+        // Store full playlist data including password in localStorage for later use
+        if (playlistData.playlist_type === 'xtream' && playlistData.xtream_password) {
+          localStorage.setItem('ippl4yActivePlaylistFull', JSON.stringify({
+            ...response.data.playlist,
+            xtream_password: playlistData.xtream_password
+          }));
+        }
+        
         // Refresh playlists
         await fetchPlaylists(deviceId);
         return { success: true, playlist: response.data.playlist };
