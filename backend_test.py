@@ -225,37 +225,46 @@ def test_invalid_url_handling():
 
 def main():
     """Run all backend API tests"""
-    print("🚀 Starting IPPL4Y URL Health Check Backend API Tests")
+    print("🚀 Starting IPPL4Y Platform Backend API Tests")
     print(f"Backend URL: {BACKEND_URL}")
     
-    results = []
+    all_results = []
     
-    # Test POST endpoint
-    results.append(("POST /api/health-check", test_post_health_check()))
+    # Run Logo Management Tests (Primary focus based on test_result.md)
+    logo_results = run_logo_management_tests()
+    all_results.extend(logo_results)
     
-    # Test GET single endpoint  
-    results.append(("GET /api/health-check/single", test_get_single_health_check()))
-    
-    # Test invalid URL handling
-    results.append(("Invalid URL Handling", test_invalid_url_handling()))
+    # Run Health Check Tests (Already tested but included for completeness)
+    health_results = run_health_check_tests()
+    all_results.extend(health_results)
     
     # Summary
-    print("\n" + "="*60)
-    print("📊 TEST RESULTS SUMMARY")
-    print("="*60)
+    print("\n" + "="*80)
+    print("📊 COMPREHENSIVE TEST RESULTS SUMMARY")
+    print("="*80)
     
     passed = 0
     failed = 0
     
-    for test_name, result in results:
+    print("\n🎨 LOGO MANAGEMENT API RESULTS:")
+    for test_name, result in logo_results:
         status = "✅ PASS" if result else "❌ FAIL"
-        print(f"{status} - {test_name}")
+        print(f"  {status} - {test_name}")
         if result:
             passed += 1
         else:
             failed += 1
     
-    print(f"\nTotal Tests: {len(results)}")
+    print("\n🏥 HEALTH CHECK API RESULTS:")
+    for test_name, result in health_results:
+        status = "✅ PASS" if result else "❌ FAIL"
+        print(f"  {status} - {test_name}")
+        if result:
+            passed += 1
+        else:
+            failed += 1
+    
+    print(f"\nTotal Tests: {len(all_results)}")
     print(f"Passed: {passed}")
     print(f"Failed: {failed}")
     
