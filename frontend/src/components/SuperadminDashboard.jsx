@@ -62,30 +62,77 @@ const SuperadminDashboard = () => {
     return diffDays > 0 ? `${diffDays} gün` : 'Süresi dolmuş';
   };
 
-  const handleCheckAllUrls = () => {
+  // Real API call to check URLs
+  const checkUrlsHealth = useCallback(async (urls) => {
+    try {
+      const response = await axios.post(`${API_URL}/api/health-check`, { urls });
+      return response.data;
+    } catch (error) {
+      console.error('URL health check failed:', error);
+      return null;
+    }
+  }, []);
+
+  const handleCheckAllUrls = async () => {
     setIsChecking(true);
-    // Simulate URL checking
-    setTimeout(() => {
-      setUrlHealthData(prev => prev.map(item => ({
-        ...item,
-        lastChecked: 'Az önce',
-        responseTime: Math.floor(Math.random() * 300) + 100
-      })));
+    try {
+      const urls = urlHealthData.map(item => item.url);
+      const healthResults = await checkUrlsHealth(urls);
+      
+      if (healthResults && healthResults.results) {
+        setUrlHealthData(prev => prev.map(item => {
+          const result = healthResults.results.find(r => r.url === item.url);
+          if (result) {
+            return {
+              ...item,
+              status: result.status,
+              responseTime: result.response_time_ms,
+              lastChecked: 'Az önce',
+              error: result.error
+            };
+          }
+          return item;
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to check URLs:', error);
+    } finally {
       setIsChecking(false);
-    }, 2000);
+    }
   };
 
-  const handleCheckSingleUrl = (provider) => {
-    setUrlHealthData(prev => prev.map(item => 
-      item.provider === provider
-        ? {
-            ...item,
-            lastChecked: 'Az önce',
-            responseTime: Math.floor(Math.random() * 300) + 100
-          }
-        : item
-    ));
+  const handleCheckSingleUrl = async (provider) => {
+    const item = urlHealthData.find(i => i.provider === provider);
+    if (!item) return;
+
+    try {
+      const response = await axios.get(`${API_URL}/api/health-check/single`, {
+        params: { url: item.url }
+      });
+      
+      if (response.data) {
+        setUrlHealthData(prev => prev.map(i => 
+          i.provider === provider
+            ? {
+                ...i,
+                status: response.data.status,
+                responseTime: response.data.response_time_ms,
+                lastChecked: 'Az önce',
+                error: response.data.error
+              }
+            : i
+        ));
+      }
+    } catch (error) {
+      console.error('Failed to check single URL:', error);
+    }
   };
+
+  // Initial health check on component mount
+  useEffect(() => {
+    handleCheckAllUrls();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const getStatusIcon = (status) => {
     switch(status) {
