@@ -129,6 +129,31 @@ class DevicePlaylistsResponse(BaseModel):
     playlists: List[PlaylistResponse]
     active_playlist: Optional[PlaylistResponse] = None
 
+
+# ==================== M3U PARSER MODELS ====================
+
+class ChannelInfo(BaseModel):
+    id: str
+    name: str
+    logo: Optional[str] = None
+    group: str = "Uncategorized"
+    stream_url: str
+    tvg_id: Optional[str] = None
+    tvg_name: Optional[str] = None
+
+class CategoryInfo(BaseModel):
+    id: str
+    name: str
+    channels: List[ChannelInfo]
+
+class ParsedPlaylistResponse(BaseModel):
+    success: bool
+    playlist_name: str
+    playlist_type: str
+    total_channels: int
+    categories: List[CategoryInfo]
+    error: Optional[str] = None
+
 # Add your routes to the router instead of directly to app
 @api_router.get("/")
 async def root():
