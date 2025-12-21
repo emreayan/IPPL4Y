@@ -1255,7 +1255,11 @@ def main():
     
     all_results = []
     
-    # Run Logo Management Tests (Primary focus based on test_result.md)
+    # Run Device & Playlist Management Tests (Primary focus based on review request)
+    device_results = run_device_playlist_tests()
+    all_results.extend(device_results)
+    
+    # Run Logo Management Tests (Already tested but included for completeness)
     logo_results = run_logo_management_tests()
     all_results.extend(logo_results)
     
@@ -1270,6 +1274,15 @@ def main():
     
     passed = 0
     failed = 0
+    
+    print("\n📱 DEVICE & PLAYLIST MANAGEMENT API RESULTS:")
+    for test_name, result in device_results:
+        status = "✅ PASS" if result else "❌ FAIL"
+        print(f"  {status} - {test_name}")
+        if result:
+            passed += 1
+        else:
+            failed += 1
     
     print("\n🎨 LOGO MANAGEMENT API RESULTS:")
     for test_name, result in logo_results:
