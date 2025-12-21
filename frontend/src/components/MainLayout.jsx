@@ -256,7 +256,13 @@ const MainLayout = () => {
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto">
           <div className="container mx-auto px-6 py-6">
-            {currentSection === 'live' && currentCategory && (
+            {/* Use LiveTVContent for real IPTV data when playlist is active */}
+            {currentSection === 'live' && activePlaylist && (
+              <LiveTVContent />
+            )}
+
+            {/* Fallback to mock data when no playlist is active */}
+            {currentSection === 'live' && !activePlaylist && currentCategory && (
               <div className="space-y-2">
                 {currentCategory.channels?.map((channel) => (
                   <Card
