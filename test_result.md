@@ -185,21 +185,15 @@ metadata:
   run_ui: true
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "Device Management API"
+    - "Playlist Management API"
+    - "Playlist Dropdown in Navigation"
+    - "Device Setup Page"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
 agent_communication:
   - agent: "main"
-    message: "URL Health Status özelliği tamamlandı. Backend endpoint /api/health-check POST ve /api/health-check/single GET olarak çalışıyor. Frontend Superadmin dashboard'da URL Sağlık Kontrolü tab'ı eklendi. Gerçek API çağrıları yapılıyor. Test için: 1) Superadmin girişi (ippl4y_admin / ippl4y2025!) 2) URL Sağlık Kontrolü tab'ına tıklayın 3) Tüm URL'leri Kontrol Et butonunu test edin. Mock URL'ler offline görünecek çünkü gerçekte mevcut değil."
-  - agent: "testing"
-    message: "Backend API testing completed successfully. Created comprehensive test suite (/app/backend_test.py) and verified both endpoints: POST /api/health-check handles multiple URLs correctly with proper response format and statistics. GET /api/health-check/single works for individual URL checks. Invalid URL handling is robust with appropriate error messages. All tests passed (3/3). Backend is fully functional and ready for frontend integration testing if needed."
-  - agent: "testing"
-    message: "Frontend UI testing completed successfully using Playwright automation. Comprehensive test performed: ✅ Superadmin login with credentials (ippl4y_admin/ippl4y2025!) works correctly ✅ Dashboard loads with 'IPPL4Y Platform Yönetimi' title ✅ URL Sağlık Kontrolü tab navigation works ✅ All statistics cards display correctly (Toplam URL: 2, Çevrimiçi: 0, Çevrimdışı: 2, Ort. Yanıt: 211ms) ✅ URL list shows both providers (Türk Telekom IPTV, Digiturk IPTV Service) with proper status badges ✅ 'Tüm URL'leri Kontrol Et' button functions and updates timestamps to 'Az önce' ✅ Individual URL refresh buttons work ✅ Backend API integration working - real API calls being made to /api/health-check endpoints ✅ Response times displayed correctly (103ms, 318ms) ✅ Status badges show 'Çevrimdışı' as expected for mock URLs. All requested features from test specification are working correctly. No critical issues found."
-  - agent: "main"
-    message: "Logo Yönetimi özelliği eklendi. Backend API: POST/GET/DELETE /api/admin/logo. Frontend: Superadmin dashboard'da Logo Yönetimi tab'ı. Login ve Navigation'da dinamik logo gösterimi. Test için: 1) Superadmin girişi 2) Logo Yönetimi tab'ına tıklayın 3) Yeni logo yükleyin (PNG/JPG/SVG, maks. 2MB) 4) Login sayfasında logonun değiştiğini görün 5) Logoyu silip varsayılana dönün"
-  - agent: "testing"
-    message: "Logo Management API backend testing completed successfully. All 9 logo management endpoints tested with 100% pass rate (12/12 total tests including health check). ✅ Complete CRUD flow verified: GET initial state → POST upload → GET after upload → File download → DELETE → GET after delete → File 404. ✅ Error handling robust: Invalid formats (.txt) and oversized files (3MB) properly rejected with Turkish error messages. ✅ File operations working: 287-byte PNG upload/download successful, proper cleanup on delete. ✅ Response formats exactly match specification. ✅ MongoDB integration functional. Backend API is production-ready. Frontend testing can proceed."
-  - agent: "testing"
-    message: "IPPL4Y Logo Management Frontend UI testing completed successfully. ✅ Superadmin login working with credentials (ippl4y_admin/ippl4y2025!) ✅ Logo Management tab accessible and functional ✅ All UI components verified: 'Mevcut Logo' card, 'Logo Yükle' card, 'Önizleme' section present ✅ Default logo (TV icon) displaying correctly with proper styling and 'Varsayılan Logo' badge ✅ Dynamic logo system working in Login page - TV icon visible in gradient background ✅ Dynamic logo system working in Navigation header ✅ Backend API integration confirmed - logo API calls successful (GET/POST/DELETE /api/admin/logo) ✅ AppContext customLogo state management functional ✅ Logo refresh functionality working ✅ File validation and error handling implemented ✅ Preview sections showing Login and Navigation logo previews. All requested logo management features are fully functional and ready for production use."
+    message: "Device & Playlist Management sistemi eklendi. Backend: /api/device/register, /api/device/{device_id}/playlists, /api/device/{device_id}/playlist endpoints. Frontend: DeviceSetup.jsx sayfası, Navigation'da playlist dropdown. Maks 10 playlist/cihaz. M3U ve Xtream Codes (DNS) destekleniyor."
