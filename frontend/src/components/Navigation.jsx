@@ -42,9 +42,27 @@ const Navigation = () => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center shadow-lg shadow-primary/20">
-              <Tv className="w-6 h-6 text-primary-foreground" />
-            </div>
+            {/* Dynamic Logo */}
+            {customLogo ? (
+              <div className="w-10 h-10 rounded-lg overflow-hidden shadow-lg shadow-primary/20">
+                <img 
+                  src={customLogo} 
+                  alt="IPPL4Y Logo" 
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.nextSibling.style.display = 'flex';
+                  }}
+                />
+                <div className="hidden w-full h-full bg-gradient-to-br from-primary to-accent items-center justify-center">
+                  <Tv className="w-6 h-6 text-primary-foreground" />
+                </div>
+              </div>
+            ) : (
+              <div className="w-10 h-10 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center shadow-lg shadow-primary/20">
+                <Tv className="w-6 h-6 text-primary-foreground" />
+              </div>
+            )}
             <div>
               <h1 className="text-xl font-bold text-foreground">IPPL4Y</h1>
               <div className="flex items-center space-x-2">
