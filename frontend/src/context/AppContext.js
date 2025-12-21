@@ -83,7 +83,10 @@ export const AppProvider = ({ children }) => {
     if (storedVisibility) {
       setChannelVisibility(JSON.parse(storedVisibility));
     }
-  }, []);
+
+    // Fetch logo on app load
+    fetchLogo();
+  }, [fetchLogo]);
 
   const applyTheme = (themeName) => {
     document.documentElement.setAttribute('data-theme', themeName);
