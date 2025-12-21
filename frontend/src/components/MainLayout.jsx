@@ -163,7 +163,7 @@ const MainLayout = () => {
             <div className="flex items-center space-x-2">
               {user?.role === 'user' && iptvService && (
                 <Badge variant="outline" className="border-primary/50 text-primary">
-                  {iptvService.provider.replace('provider_', '')}
+                  {iptvService.name || iptvService.provider?.replace('provider_', '') || 'IPTV'}
                 </Badge>
               )}
 
