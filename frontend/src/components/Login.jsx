@@ -26,7 +26,7 @@ const Login = () => {
       return;
     }
 
-    const result = loginToApp(appUsername, appPassword);
+    const result = await loginToApp(appUsername, appPassword);
     
     if (result.success) {
       // All users go directly to home - IPTV setup is now device-based
