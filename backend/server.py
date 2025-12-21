@@ -763,6 +763,265 @@ async def set_active_playlist(device_id: str, playlist_id: str):
         "active_playlist_id": playlist_id
     }
 
+
+# ==================== M3U PARSER ENDPOINTS ====================
+
+def parse_m3u_content(content: str) -> List[Dict[str, Any]]:
+    """Parse M3U/M3U8 content and extract channel information"""
+    channels = []
+    lines = content.strip().split('\n')
+    
+    current_channel = {}
+    
+    for i, line in enumerate(lines):
+        line = line.strip()
+        
+        if line.startswith('#EXTINF:'):
+            # Parse EXTINF line
+            # Format: #EXTINF:-1 tvg-id="..." tvg-name="..." tvg-logo="..." group-title="...",Channel Name
+            current_channel = {
+                'id': str(uuid.uuid4()),
+                'name': 'Unknown',
+                'logo': None,
+                'group': 'Uncategorized',
+                'tvg_id': None,
+                'tvg_name': None
+            }
+            
+            # Extract attributes using regex
+            tvg_id_match = re.search(r'tvg-id="([^"]*)"', line)
+            tvg_name_match = re.search(r'tvg-name="([^"]*)"', line)
+            tvg_logo_match = re.search(r'tvg-logo="([^"]*)"', line)
+            group_match = re.search(r'group-title="([^"]*)"', line)
+            
+            if tvg_id_match:
+                current_channel['tvg_id'] = tvg_id_match.group(1)
+            if tvg_name_match:
+                current_channel['tvg_name'] = tvg_name_match.group(1)
+            if tvg_logo_match:
+                current_channel['logo'] = tvg_logo_match.group(1)
+            if group_match:
+                current_channel['group'] = group_match.group(1) or 'Uncategorized'
+            
+            # Extract channel name (after the last comma)
+            name_match = re.search(r',(.+)$', line)
+            if name_match:
+                current_channel['name'] = name_match.group(1).strip()
+            elif current_channel['tvg_name']:
+                current_channel['name'] = current_channel['tvg_name']
+                
+        elif line and not line.startswith('#') and current_channel:
+            # This is the stream URL
+            current_channel['stream_url'] = line
+            channels.append(current_channel)
+            current_channel = {}
+    
+    return channels
+
+
+def group_channels_by_category(channels: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Group channels by their group/category"""
+    categories_dict = {}
+    
+    for channel in channels:
+        group = channel.get('group', 'Uncategorized') or 'Uncategorized'
+        
+        if group not in categories_dict:
+            categories_dict[group] = {
+                'id': str(uuid.uuid4()),
+                'name': group,
+                'channels': []
+            }
+        
+        categories_dict[group]['channels'].append({
+            'id': channel['id'],
+            'name': channel['name'],
+            'logo': channel.get('logo'),
+            'group': group,
+            'stream_url': channel['stream_url'],
+            'tvg_id': channel.get('tvg_id'),
+            'tvg_name': channel.get('tvg_name')
+        })
+    
+    # Sort categories alphabetically, but put common ones first
+    priority_categories = ['TURKEY', 'TR', 'TÜRKİYE', 'LIVE', 'CANLI', 'SPORTS', 'SPOR', 'NEWS', 'HABER', 'MOVIES', 'FİLM']
+    
+    sorted_categories = []
+    remaining = []
+    
+    for cat_name, cat_data in categories_dict.items():
+        is_priority = any(p.lower() in cat_name.lower() for p in priority_categories)
+        if is_priority:
+            sorted_categories.append(cat_data)
+        else:
+            remaining.append(cat_data)
+    
+    # Sort each list alphabetically
+    sorted_categories.sort(key=lambda x: x['name'].lower())
+    remaining.sort(key=lambda x: x['name'].lower())
+    
+    return sorted_categories + remaining
+
+
+@api_router.get("/playlist/{playlist_id}/parse")
+async def parse_playlist(playlist_id: str, limit: Optional[int] = None):
+    """Parse a playlist and return channel list grouped by category"""
+    
+    # Find playlist in database
+    playlist = await db.playlists.find_one({"id": playlist_id}, {"_id": 0})
+    
+    if not playlist:
+        raise HTTPException(status_code=404, detail="Playlist bulunamadı")
+    
+    playlist_url = playlist.get('playlist_url')
+    playlist_type = playlist.get('playlist_type', 'm3u')
+    playlist_name = playlist.get('playlist_name', 'Unknown')
+    
+    try:
+        if playlist_type == 'xtream':
+            # For Xtream Codes, construct the M3U URL
+            username = playlist.get('xtream_username')
+            password = playlist.get('xtream_password')
+            
+            if not username or not password:
+                raise HTTPException(status_code=400, detail="Xtream credentials eksik")
+            
+            # Construct M3U URL from Xtream server
+            base_url = playlist_url.rstrip('/')
+            m3u_url = f"{base_url}/get.php?username={username}&password={password}&type=m3u_plus&output=mpegts"
+        else:
+            m3u_url = playlist_url
+        
+        logger.info(f"Fetching playlist from: {m3u_url[:50]}...")
+        
+        # Fetch the M3U content
+        async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
+            response = await client.get(m3u_url)
+            response.raise_for_status()
+            content = response.text
+        
+        # Parse the M3U content
+        channels = parse_m3u_content(content)
+        
+        logger.info(f"Parsed {len(channels)} channels from playlist")
+        
+        # Apply limit if specified
+        if limit and limit > 0:
+            channels = channels[:limit]
+        
+        # Group by category
+        categories = group_channels_by_category(channels)
+        
+        # Cache the parsed data in database for faster subsequent access
+        await db.parsed_playlists.update_one(
+            {"playlist_id": playlist_id},
+            {
+                "$set": {
+                    "playlist_id": playlist_id,
+                    "categories": categories,
+                    "total_channels": len(channels),
+                    "parsed_at": datetime.now(timezone.utc).isoformat()
+                }
+            },
+            upsert=True
+        )
+        
+        return {
+            "success": True,
+            "playlist_name": playlist_name,
+            "playlist_type": playlist_type,
+            "total_channels": len(channels),
+            "categories": categories,
+            "error": None
+        }
+        
+    except httpx.HTTPError as e:
+        logger.error(f"HTTP error fetching playlist: {str(e)}")
+        return {
+            "success": False,
+            "playlist_name": playlist_name,
+            "playlist_type": playlist_type,
+            "total_channels": 0,
+            "categories": [],
+            "error": f"Playlist URL'e erişilemedi: {str(e)}"
+        }
+    except Exception as e:
+        logger.error(f"Error parsing playlist: {str(e)}")
+        return {
+            "success": False,
+            "playlist_name": playlist_name,
+            "playlist_type": playlist_type,
+            "total_channels": 0,
+            "categories": [],
+            "error": f"Playlist parse hatası: {str(e)}"
+        }
+
+
+@api_router.get("/playlist/{playlist_id}/cached")
+async def get_cached_playlist(playlist_id: str):
+    """Get cached parsed playlist data"""
+    
+    cached = await db.parsed_playlists.find_one({"playlist_id": playlist_id}, {"_id": 0})
+    
+    if not cached:
+        raise HTTPException(status_code=404, detail="Cached playlist bulunamadı. Önce /parse endpoint'ini çağırın.")
+    
+    return cached
+
+
+@api_router.post("/playlist/parse-url")
+async def parse_playlist_url(url: str, playlist_type: str = "m3u", xtream_username: Optional[str] = None, xtream_password: Optional[str] = None, limit: Optional[int] = 100):
+    """Parse a playlist URL directly without saving to database"""
+    
+    try:
+        if playlist_type == 'xtream':
+            if not xtream_username or not xtream_password:
+                raise HTTPException(status_code=400, detail="Xtream credentials gerekli")
+            
+            base_url = url.rstrip('/')
+            m3u_url = f"{base_url}/get.php?username={xtream_username}&password={xtream_password}&type=m3u_plus&output=mpegts"
+        else:
+            m3u_url = url
+        
+        logger.info(f"Direct parsing playlist from: {m3u_url[:50]}...")
+        
+        async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
+            response = await client.get(m3u_url)
+            response.raise_for_status()
+            content = response.text
+        
+        channels = parse_m3u_content(content)
+        
+        if limit and limit > 0:
+            channels = channels[:limit]
+        
+        categories = group_channels_by_category(channels)
+        
+        return {
+            "success": True,
+            "playlist_type": playlist_type,
+            "total_channels": len(channels),
+            "categories": categories,
+            "error": None
+        }
+        
+    except httpx.HTTPError as e:
+        return {
+            "success": False,
+            "playlist_type": playlist_type,
+            "total_channels": 0,
+            "categories": [],
+            "error": f"URL'e erişilemedi: {str(e)}"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "playlist_type": playlist_type,
+            "total_channels": 0,
+            "categories": [],
+            "error": f"Parse hatası: {str(e)}"
+        }
+
 # Include the router in the main app
 app.include_router(api_router)
 
