@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
-Backend API Tests for IPPL4Y URL Health Check Feature
-Tests the health check endpoints as specified in the review request.
+Backend API Tests for IPPL4Y Platform
+Tests the health check and logo management endpoints as specified in the review request.
 """
 
 import requests
 import json
 import time
+import io
+from PIL import Image
 from typing import Dict, Any
 
 # Get backend URL from frontend .env
