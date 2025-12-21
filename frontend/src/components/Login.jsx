@@ -14,7 +14,7 @@ const Login = () => {
   const [appUsername, setAppUsername] = useState('');
   const [appPassword, setAppPassword] = useState('');
   const [error, setError] = useState('');
-  const { loginToApp } = useApp();
+  const { loginToApp, customLogo, logoLoading } = useApp();
   const navigate = useNavigate();
 
   const handleLogin = (e, role) => {
