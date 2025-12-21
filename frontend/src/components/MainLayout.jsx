@@ -211,13 +211,13 @@ const MainLayout = () => {
             <AlertCircle className="h-4 w-4 text-accent" />
             <AlertDescription className="flex items-center justify-between">
               <span className="text-foreground">
-                IPTV servisi bağlı değil. Kanalları izleyebilmek için IPTV provider'ınızdan aldığınız bilgileri ekleyin.
+                IPTV servisi bağlı değil. Cihaz ayarlarından playlist ekleyerek kanalları izleyebilirsiniz.
               </span>
               <Button
-                onClick={() => navigate('/iptv-setup')}
+                onClick={() => navigate('/device-setup')}
                 className="ml-4 bg-accent hover:bg-accent/90 text-accent-foreground"
               >
-                IPTV Ekle
+                Cihaz Ayarları
               </Button>
             </AlertDescription>
           </Alert>
