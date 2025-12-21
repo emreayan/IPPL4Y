@@ -321,20 +321,23 @@ const MainLayout = () => {
             )}
 
             {(currentSection === 'series' || currentSection === 'movies') && (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
                 {currentSection === 'series' && currentCategory?.series?.map((series) => (
                   <Card
                     key={series.id}
-                    className="bg-card/50 border-border hover:border-primary transition-all duration-300 overflow-hidden group cursor-pointer"
+                    className="bg-card/50 border-border hover:border-primary transition-all duration-300 overflow-hidden group cursor-pointer hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-1"
                     onClick={() => handleSeriesClick(series)}
                   >
                     <div className="relative aspect-[2/3] bg-secondary">
                       <img src={series.poster} alt={series.title} className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center transform group-hover:scale-110 transition-transform duration-300">
-                            <Play className="w-8 h-8 text-primary-foreground" fill="currentColor" />
+                          <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center transform group-hover:scale-110 transition-transform duration-300 shadow-lg shadow-primary/50">
+                            <Play className="w-6 h-6 text-primary-foreground" fill="currentColor" />
                           </div>
+                        </div>
+                        <div className="absolute bottom-0 left-0 right-0 p-2">
+                          <p className="text-xs text-white/90 line-clamp-2">{series.description}</p>
                         </div>
                       </div>
                       <button
@@ -342,18 +345,18 @@ const MainLayout = () => {
                           e.stopPropagation();
                           toggleFavorite(series, 'series');
                         }}
-                        className="absolute top-2 right-2 w-8 h-8 rounded-full bg-card/80 flex items-center justify-center hover:bg-card transition-all duration-200 z-10"
+                        className="absolute top-1 right-1 w-7 h-7 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center hover:bg-black/80 transition-all duration-200 z-10"
                       >
-                        <Heart className={`w-4 h-4 ${isFavorite(series.id, 'series') ? 'fill-accent text-accent' : 'text-foreground'}`} />
+                        <Heart className={`w-3 h-3 ${isFavorite(series.id, 'series') ? 'fill-accent text-accent' : 'text-white'}`} />
                       </button>
-                      <div className="absolute top-2 left-2 flex items-center space-x-1 bg-card/80 px-2 py-1 rounded">
+                      <div className="absolute top-1 left-1 flex items-center space-x-1 bg-black/70 backdrop-blur-sm px-1.5 py-0.5 rounded">
                         <Star className="w-3 h-3 text-accent" fill="#facc15" />
-                        <span className="text-xs text-foreground font-semibold">{series.imdb}</span>
+                        <span className="text-xs text-white font-semibold">{series.imdb}</span>
                       </div>
                     </div>
-                    <div className="p-3">
-                      <h3 className="font-semibold text-foreground text-sm mb-1 line-clamp-1">{series.title}</h3>
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <div className="p-2">
+                      <h3 className="font-semibold text-foreground text-xs mb-1 line-clamp-1">{series.title}</h3>
+                      <div className="flex items-center justify-between text-[10px] text-muted-foreground">
                         <span>{series.year}</span>
                         <span>{series.seasons?.length} Sezon</span>
                       </div>
@@ -364,16 +367,19 @@ const MainLayout = () => {
                 {currentSection === 'movies' && currentCategory?.movies?.map((movie) => (
                   <Card
                     key={movie.id}
-                    className="bg-card/50 border-border hover:border-primary transition-all duration-300 overflow-hidden group cursor-pointer"
+                    className="bg-card/50 border-border hover:border-primary transition-all duration-300 overflow-hidden group cursor-pointer hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-1"
                     onClick={() => handlePlay(movie, 'movie')}
                   >
                     <div className="relative aspect-[2/3] bg-secondary">
                       <img src={movie.poster} alt={movie.title} className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center transform group-hover:scale-110 transition-transform duration-300">
-                            <Play className="w-8 h-8 text-primary-foreground" fill="currentColor" />
+                          <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center transform group-hover:scale-110 transition-transform duration-300 shadow-lg shadow-primary/50">
+                            <Play className="w-6 h-6 text-primary-foreground" fill="currentColor" />
                           </div>
+                        </div>
+                        <div className="absolute bottom-0 left-0 right-0 p-2">
+                          <p className="text-xs text-white/90 line-clamp-2">{movie.description}</p>
                         </div>
                       </div>
                       <button
@@ -381,18 +387,18 @@ const MainLayout = () => {
                           e.stopPropagation();
                           toggleFavorite(movie, 'movie');
                         }}
-                        className="absolute top-2 right-2 w-8 h-8 rounded-full bg-card/80 flex items-center justify-center hover:bg-card transition-all duration-200 z-10"
+                        className="absolute top-1 right-1 w-7 h-7 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center hover:bg-black/80 transition-all duration-200 z-10"
                       >
-                        <Heart className={`w-4 h-4 ${isFavorite(movie.id, 'movie') ? 'fill-accent text-accent' : 'text-foreground'}`} />
+                        <Heart className={`w-4 h-4 ${isFavorite(movie.id, 'movie') ? 'fill-accent text-accent' : 'text-white'}`} />
                       </button>
-                      <div className="absolute top-2 left-2 flex items-center space-x-1 bg-card/80 px-2 py-1 rounded">
+                      <div className="absolute top-1 left-1 flex items-center space-x-1 bg-black/70 backdrop-blur-sm px-1.5 py-0.5 rounded">
                         <Star className="w-3 h-3 text-accent" fill="#facc15" />
-                        <span className="text-xs text-foreground font-semibold">{movie.imdb}</span>
+                        <span className="text-xs text-white font-semibold">{movie.imdb}</span>
                       </div>
                     </div>
-                    <div className="p-3">
-                      <h3 className="font-semibold text-foreground text-sm mb-1 line-clamp-1">{movie.title}</h3>
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <div className="p-2">
+                      <h3 className="font-semibold text-foreground text-xs mb-1 line-clamp-1">{movie.title}</h3>
+                      <div className="flex items-center justify-between text-[10px] text-muted-foreground">
                         <span>{movie.year}</span>
                         <span>{movie.duration}</span>
                       </div>
