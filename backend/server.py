@@ -1034,6 +1034,173 @@ async def parse_playlist_url(url: str, playlist_type: str = "m3u", xtream_userna
             "error": f"Parse hatası: {str(e)}"
         }
 
+
+# ==================== XTREAM CODES API ENDPOINTS ====================
+
+XTREAM_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': '*/*',
+    'X-Forwarded-For': '85.95.236.89',
+    'X-Real-IP': '85.95.236.89'
+}
+
+@api_router.post("/xtream/auth")
+async def xtream_authenticate(server_url: str, username: str, password: str):
+    """Authenticate with Xtream Codes server and get account info"""
+    try:
+        base_url = server_url.rstrip('/')
+        api_url = f"{base_url}/player_api.php?username={username}&password={password}"
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(api_url, headers=XTREAM_HEADERS)
+            response.raise_for_status()
+            data = response.json()
+        
+        if data.get('user_info', {}).get('auth') == 1:
+            return {
+                "success": True,
+                "user_info": data.get('user_info'),
+                "server_info": data.get('server_info')
+            }
+        else:
+            return {
+                "success": False,
+                "error": "Kimlik doğrulama başarısız"
+            }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
+@api_router.post("/xtream/live-categories")
+async def get_xtream_live_categories(server_url: str, username: str, password: str):
+    """Get live TV categories from Xtream Codes server"""
+    try:
+        base_url = server_url.rstrip('/')
+        api_url = f"{base_url}/player_api.php?username={username}&password={password}&action=get_live_categories"
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(api_url, headers=XTREAM_HEADERS)
+            response.raise_for_status()
+            categories = response.json()
+        
+        return {
+            "success": True,
+            "total": len(categories),
+            "categories": categories
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "categories": []
+        }
+
+
+@api_router.post("/xtream/live-streams")
+async def get_xtream_live_streams(server_url: str, username: str, password: str, category_id: Optional[str] = None):
+    """Get live streams from Xtream Codes server"""
+    try:
+        base_url = server_url.rstrip('/')
+        api_url = f"{base_url}/player_api.php?username={username}&password={password}&action=get_live_streams"
+        
+        if category_id:
+            api_url += f"&category_id={category_id}"
+        
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.get(api_url, headers=XTREAM_HEADERS)
+            response.raise_for_status()
+            streams = response.json()
+        
+        # Transform to our channel format
+        channels = []
+        for stream in streams:
+            channels.append({
+                "id": str(stream.get('stream_id', '')),
+                "name": stream.get('name', 'Unknown'),
+                "logo": stream.get('stream_icon', ''),
+                "group": stream.get('category_id', 'Uncategorized'),
+                "stream_url": f"{base_url}/live/{username}/{password}/{stream.get('stream_id')}.m3u8",
+                "epg_channel_id": stream.get('epg_channel_id'),
+                "is_adult": stream.get('is_adult', '0') == '1'
+            })
+        
+        return {
+            "success": True,
+            "total": len(channels),
+            "channels": channels
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "channels": []
+        }
+
+
+@api_router.post("/xtream/full-data")
+async def get_xtream_full_data(server_url: str, username: str, password: str, include_vod: bool = False, include_series: bool = False):
+    """Get all categories and channels from Xtream Codes server"""
+    try:
+        base_url = server_url.rstrip('/')
+        
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            # Get live categories
+            cat_url = f"{base_url}/player_api.php?username={username}&password={password}&action=get_live_categories"
+            cat_response = await client.get(cat_url, headers=XTREAM_HEADERS)
+            categories_raw = cat_response.json() if cat_response.status_code == 200 else []
+            
+            # Get live streams
+            streams_url = f"{base_url}/player_api.php?username={username}&password={password}&action=get_live_streams"
+            streams_response = await client.get(streams_url, headers=XTREAM_HEADERS)
+            streams_raw = streams_response.json() if streams_response.status_code == 200 else []
+        
+        # Create category lookup
+        category_lookup = {str(c.get('category_id')): c.get('category_name', 'Uncategorized') for c in categories_raw}
+        
+        # Group streams by category
+        categories_dict = {}
+        
+        for stream in streams_raw:
+            cat_id = str(stream.get('category_id', ''))
+            cat_name = category_lookup.get(cat_id, 'Uncategorized')
+            
+            if cat_name not in categories_dict:
+                categories_dict[cat_name] = {
+                    "id": cat_id,
+                    "name": cat_name,
+                    "channels": []
+                }
+            
+            categories_dict[cat_name]["channels"].append({
+                "id": str(stream.get('stream_id', '')),
+                "name": stream.get('name', 'Unknown'),
+                "logo": stream.get('stream_icon', ''),
+                "group": cat_name,
+                "stream_url": f"{base_url}/live/{username}/{password}/{stream.get('stream_id')}.m3u8",
+                "epg_channel_id": stream.get('epg_channel_id'),
+                "num": stream.get('num', 0)
+            })
+        
+        # Sort categories
+        sorted_categories = sorted(categories_dict.values(), key=lambda x: x['name'])
+        
+        return {
+            "success": True,
+            "total_categories": len(sorted_categories),
+            "total_channels": len(streams_raw),
+            "categories": sorted_categories
+        }
+    except Exception as e:
+        logger.error(f"Xtream full data error: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "categories": []
+        }
+
 # Include the router in the main app
 app.include_router(api_router)
 
