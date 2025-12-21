@@ -177,8 +177,9 @@ metadata:
 
 test_plan:
   current_focus:
-    - "URL Health Check API Endpoint"
-    - "Superadmin Dashboard URL Health Check UI"
+    - "Logo Management API Endpoints"
+    - "Logo Management UI in Superadmin Dashboard"
+    - "Dynamic Logo Display"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -190,3 +191,5 @@ agent_communication:
     message: "Backend API testing completed successfully. Created comprehensive test suite (/app/backend_test.py) and verified both endpoints: POST /api/health-check handles multiple URLs correctly with proper response format and statistics. GET /api/health-check/single works for individual URL checks. Invalid URL handling is robust with appropriate error messages. All tests passed (3/3). Backend is fully functional and ready for frontend integration testing if needed."
   - agent: "testing"
     message: "Frontend UI testing completed successfully using Playwright automation. Comprehensive test performed: ✅ Superadmin login with credentials (ippl4y_admin/ippl4y2025!) works correctly ✅ Dashboard loads with 'IPPL4Y Platform Yönetimi' title ✅ URL Sağlık Kontrolü tab navigation works ✅ All statistics cards display correctly (Toplam URL: 2, Çevrimiçi: 0, Çevrimdışı: 2, Ort. Yanıt: 211ms) ✅ URL list shows both providers (Türk Telekom IPTV, Digiturk IPTV Service) with proper status badges ✅ 'Tüm URL'leri Kontrol Et' button functions and updates timestamps to 'Az önce' ✅ Individual URL refresh buttons work ✅ Backend API integration working - real API calls being made to /api/health-check endpoints ✅ Response times displayed correctly (103ms, 318ms) ✅ Status badges show 'Çevrimdışı' as expected for mock URLs. All requested features from test specification are working correctly. No critical issues found."
+  - agent: "main"
+    message: "Logo Yönetimi özelliği eklendi. Backend API: POST/GET/DELETE /api/admin/logo. Frontend: Superadmin dashboard'da Logo Yönetimi tab'ı. Login ve Navigation'da dinamik logo gösterimi. Test için: 1) Superadmin girişi 2) Logo Yönetimi tab'ına tıklayın 3) Yeni logo yükleyin (PNG/JPG/SVG, maks. 2MB) 4) Login sayfasında logonun değiştiğini görün 5) Logoyu silip varsayılana dönün"
