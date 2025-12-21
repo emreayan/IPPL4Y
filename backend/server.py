@@ -76,6 +76,58 @@ class LogoResponse(BaseModel):
     logo_url: Optional[str] = None
     uploaded_at: Optional[str] = None
 
+
+# ==================== DEVICE & PLAYLIST MODELS ====================
+
+MAX_PLAYLISTS_PER_DEVICE = 10
+
+class DeviceRegisterRequest(BaseModel):
+    device_id: str  # MAC format: 11:30:02:28:02:bb
+    device_key: str  # Numeric: 1323008583
+    platform: Optional[str] = "unknown"  # android_tv, webos, tizen, web
+
+class DeviceResponse(BaseModel):
+    device_id: str
+    device_key: str
+    platform: str
+    status: str  # unregistered, registered, active
+    created_at: str
+    last_seen_at: str
+
+class PlaylistType(BaseModel):
+    type: str  # 'm3u' or 'xtream'
+
+class PlaylistCreateRequest(BaseModel):
+    playlist_name: str
+    playlist_url: str  # M3U URL or Xtream base URL (http://server:port)
+    playlist_type: str = "m3u"  # 'm3u' or 'xtream'
+    # Xtream specific fields (optional)
+    xtream_username: Optional[str] = None
+    xtream_password: Optional[str] = None
+
+class PlaylistUpdateRequest(BaseModel):
+    playlist_name: Optional[str] = None
+    playlist_url: Optional[str] = None
+    playlist_type: Optional[str] = None
+    xtream_username: Optional[str] = None
+    xtream_password: Optional[str] = None
+
+class PlaylistResponse(BaseModel):
+    id: str
+    device_id: str
+    playlist_name: str
+    playlist_url: str
+    playlist_type: str
+    xtream_username: Optional[str] = None
+    is_active: bool
+    created_at: str
+
+class DevicePlaylistsResponse(BaseModel):
+    device_id: str
+    device_status: str
+    playlists: List[PlaylistResponse]
+    active_playlist: Optional[PlaylistResponse] = None
+
 # Add your routes to the router instead of directly to app
 @api_router.get("/")
 async def root():
