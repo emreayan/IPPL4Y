@@ -894,12 +894,14 @@ async def parse_playlist(playlist_id: str, limit: Optional[int] = None):
         
         logger.info(f"Fetching playlist from: {m3u_url[:50]}...")
         
-        # Fetch the M3U content with proper headers
+        # Fetch the M3U content with proper headers to bypass CDN restrictions
         headers = {
-            'User-Agent': 'IPPL4Y/1.0 (IPTV Player)',
-            'Accept': '*/*'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': '*/*',
+            'X-Forwarded-For': '85.95.236.89',
+            'X-Real-IP': '85.95.236.89'
         }
-        async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=120.0, follow_redirects=True) as client:
             response = await client.get(m3u_url, headers=headers)
             response.raise_for_status()
             content = response.text
