@@ -5,6 +5,8 @@ import { AppProvider, useApp } from "./context/AppContext";
 import Login from "./components/Login";
 import Home from "./components/Home";
 import Player from "./components/Player";
+import BouquetSettings from "./components/BouquetSettings";
+import AdminPanel from "./components/AdminPanel";
 import { Toaster } from "./components/ui/sonner";
 
 const ProtectedRoute = ({ children }) => {
@@ -30,6 +32,30 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <Player />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/bouquet-settings"
+          element={
+            <ProtectedRoute>
+              <BouquetSettings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <AdminPanel />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/superadmin"
+          element={
+            <ProtectedRoute>
+              <AdminPanel />
             </ProtectedRoute>
           }
         />
