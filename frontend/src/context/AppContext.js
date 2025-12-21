@@ -26,6 +26,12 @@ export const AppProvider = ({ children }) => {
   const [channelVisibility, setChannelVisibility] = useState({});
   const [customLogo, setCustomLogo] = useState(null);
   const [logoLoading, setLogoLoading] = useState(true);
+  
+  // Device & Playlist State
+  const [deviceInfo, setDeviceInfo] = useState(null);
+  const [playlists, setPlaylists] = useState([]);
+  const [activePlaylist, setActivePlaylist] = useState(null);
+  const [playlistsLoading, setPlaylistsLoading] = useState(false);
 
   // Fetch logo from API
   const fetchLogo = useCallback(async () => {
@@ -33,7 +39,6 @@ export const AppProvider = ({ children }) => {
       setLogoLoading(true);
       const response = await axios.get(`${API_URL}/api/admin/logo`);
       if (response.data.has_custom_logo) {
-        // Add timestamp to prevent caching
         setCustomLogo(`${API_URL}/api/admin/logo/file?t=${Date.now()}`);
       } else {
         setCustomLogo(null);
@@ -46,10 +51,166 @@ export const AppProvider = ({ children }) => {
     }
   }, []);
 
-  // Refresh logo (called after upload/delete)
   const refreshLogo = useCallback(() => {
     fetchLogo();
   }, [fetchLogo]);
+
+  // Generate simulated Device ID (MAC-like format) for web
+  const generateDeviceId = useCallback(() => {
+    const stored = localStorage.getItem('ippl4yDeviceId');
+    if (stored) return stored;
+    
+    // Generate MAC-like format: XX:XX:XX:XX:XX:XX
+    const hex = () => Math.floor(Math.random() * 256).toString(16).padStart(2, '0');
+    const deviceId = `${hex()}:${hex()}:${hex()}:${hex()}:${hex()}:${hex()}`;
+    localStorage.setItem('ippl4yDeviceId', deviceId);
+    return deviceId;
+  }, []);
+
+  // Generate simulated Device Key for web
+  const generateDeviceKey = useCallback(() => {
+    const stored = localStorage.getItem('ippl4yDeviceKey');
+    if (stored) return stored;
+    
+    // Generate 10-digit numeric key
+    const deviceKey = Math.floor(1000000000 + Math.random() * 9000000000).toString();
+    localStorage.setItem('ippl4yDeviceKey', deviceKey);
+    return deviceKey;
+  }, []);
+
+  // Get or create device credentials
+  const getDeviceCredentials = useCallback(() => {
+    return {
+      device_id: generateDeviceId(),
+      device_key: generateDeviceKey()
+    };
+  }, [generateDeviceId, generateDeviceKey]);
+
+  // Register device with backend
+  const registerDevice = useCallback(async (deviceId, deviceKey, platform = 'web') => {
+    try {
+      const response = await axios.post(`${API_URL}/api/device/register`, {
+        device_id: deviceId,
+        device_key: deviceKey,
+        platform
+      });
+      
+      if (response.data.success) {
+        setDeviceInfo(response.data.device);
+        localStorage.setItem('ippl4yDeviceInfo', JSON.stringify(response.data.device));
+        return { success: true, device: response.data.device };
+      }
+      return { success: false, error: response.data.message };
+    } catch (error) {
+      console.error('Device registration failed:', error);
+      return { 
+        success: false, 
+        error: error.response?.data?.detail || 'Cihaz kaydı başarısız' 
+      };
+    }
+  }, []);
+
+  // Fetch playlists for device
+  const fetchPlaylists = useCallback(async (deviceId) => {
+    if (!deviceId) return;
+    
+    setPlaylistsLoading(true);
+    try {
+      const response = await axios.get(`${API_URL}/api/device/${deviceId}/playlists`);
+      const data = response.data;
+      
+      setPlaylists(data.playlists || []);
+      setActivePlaylist(data.active_playlist || null);
+      
+      // If we have an active playlist, set it as the IPTV service
+      if (data.active_playlist) {
+        const playlist = data.active_playlist;
+        const serviceData = {
+          id: playlist.id,
+          name: playlist.playlist_name,
+          url: playlist.playlist_url,
+          type: playlist.playlist_type,
+          username: playlist.xtream_username,
+          isActive: true
+        };
+        setIptvService(serviceData);
+        setIptvConnected(true);
+        localStorage.setItem('ippl4yIptvService', JSON.stringify(serviceData));
+      }
+      
+      return { success: true, playlists: data.playlists };
+    } catch (error) {
+      console.error('Failed to fetch playlists:', error);
+      return { success: false, error: 'Playlistler yüklenemedi' };
+    } finally {
+      setPlaylistsLoading(false);
+    }
+  }, []);
+
+  // Add playlist to device
+  const addPlaylist = useCallback(async (deviceId, playlistData) => {
+    try {
+      const response = await axios.post(
+        `${API_URL}/api/device/${deviceId}/playlist`,
+        playlistData
+      );
+      
+      if (response.data.success) {
+        // Refresh playlists
+        await fetchPlaylists(deviceId);
+        return { success: true, playlist: response.data.playlist };
+      }
+      return { success: false, error: response.data.message };
+    } catch (error) {
+      console.error('Failed to add playlist:', error);
+      return { 
+        success: false, 
+        error: error.response?.data?.detail || 'Playlist eklenemedi' 
+      };
+    }
+  }, [fetchPlaylists]);
+
+  // Delete playlist
+  const deletePlaylist = useCallback(async (deviceId, playlistId) => {
+    try {
+      const response = await axios.delete(
+        `${API_URL}/api/device/${deviceId}/playlist/${playlistId}`
+      );
+      
+      if (response.data.success) {
+        await fetchPlaylists(deviceId);
+        return { success: true };
+      }
+      return { success: false, error: response.data.message };
+    } catch (error) {
+      console.error('Failed to delete playlist:', error);
+      return { 
+        success: false, 
+        error: error.response?.data?.detail || 'Playlist silinemedi' 
+      };
+    }
+  }, [fetchPlaylists]);
+
+  // Switch active playlist
+  const switchPlaylist = useCallback(async (deviceId, playlistId) => {
+    try {
+      const response = await axios.put(
+        `${API_URL}/api/device/${deviceId}/playlist/${playlistId}/active`
+      );
+      
+      if (response.data.success) {
+        await fetchPlaylists(deviceId);
+        return { success: true };
+      }
+      return { success: false, error: response.data.message };
+    } catch (error) {
+      console.error('Failed to switch playlist:', error);
+      return { 
+        success: false, 
+        error: error.response?.data?.detail || 'Playlist değiştirilemedi' 
+      };
+    }
+  }, [fetchPlaylists]);
 
   useEffect(() => {
     // Check if user is already logged in
@@ -58,10 +219,19 @@ export const AppProvider = ({ children }) => {
     const storedFavorites = localStorage.getItem('ippl4yFavorites');
     const storedTheme = localStorage.getItem('ippl4yTheme');
     const storedVisibility = localStorage.getItem('ippl4yChannelVisibility');
+    const storedDeviceInfo = localStorage.getItem('ippl4yDeviceInfo');
     
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      const userData = JSON.parse(storedUser);
+      setUser(userData);
       setIsAuthenticated(true);
+      
+      // If user is a customer, fetch their playlists
+      if (userData.role === 'user' && storedDeviceInfo) {
+        const device = JSON.parse(storedDeviceInfo);
+        setDeviceInfo(device);
+        fetchPlaylists(device.device_id);
+      }
     }
 
     if (storedIptvService) {
@@ -86,7 +256,7 @@ export const AppProvider = ({ children }) => {
 
     // Fetch logo on app load
     fetchLogo();
-  }, [fetchLogo]);
+  }, [fetchLogo, fetchPlaylists]);
 
   const applyTheme = (themeName) => {
     document.documentElement.setAttribute('data-theme', themeName);
@@ -138,17 +308,15 @@ export const AppProvider = ({ children }) => {
     return { success: false, error: 'Invalid IPPL4Y credentials' };
   };
 
-  // Step 2: Connect to IPTV Service (only for users)
+  // Step 2: Connect to IPTV Service (legacy - kept for backward compatibility)
   const connectToIptvService = (m3uUrl, username, password) => {
     if (!user || user.role !== 'user') {
       return { success: false, error: 'Only customers can connect to IPTV service' };
     }
 
-    // Check if user has valid IPTV credentials from an admin
     const iptvCreds = iptvServiceCredentials[user.username];
     
     if (iptvCreds) {
-      // Verify credentials
       if (iptvCreds.m3uUrl === m3uUrl && 
           iptvCreds.username === username && 
           iptvCreds.password === password) {
@@ -172,6 +340,8 @@ export const AppProvider = ({ children }) => {
     setIptvService(null);
     setIsAuthenticated(false);
     setIptvConnected(false);
+    setPlaylists([]);
+    setActivePlaylist(null);
   };
 
   const toggleFavorite = (item, type) => {
@@ -205,7 +375,7 @@ export const AppProvider = ({ children }) => {
   };
 
   const isChannelVisible = (channelId) => {
-    return channelVisibility[channelId] !== false; // Default to visible
+    return channelVisibility[channelId] !== false;
   };
 
   return (
@@ -232,7 +402,18 @@ export const AppProvider = ({ children }) => {
         isChannelVisible,
         customLogo,
         logoLoading,
-        refreshLogo
+        refreshLogo,
+        // Device & Playlist
+        deviceInfo,
+        playlists,
+        activePlaylist,
+        playlistsLoading,
+        getDeviceCredentials,
+        registerDevice,
+        fetchPlaylists,
+        addPlaylist,
+        deletePlaylist,
+        switchPlaylist
       }}
     >
       {children}
