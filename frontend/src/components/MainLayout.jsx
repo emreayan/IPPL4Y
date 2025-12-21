@@ -256,51 +256,64 @@ const MainLayout = () => {
         <div className="flex-1 overflow-y-auto">
           <div className="container mx-auto px-6 py-6">
             {currentSection === 'live' && currentCategory && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="space-y-2">
                 {currentCategory.channels?.map((channel) => (
                   <Card
                     key={channel.id}
                     className="bg-card/50 border-border hover:border-primary transition-all duration-300 overflow-hidden group cursor-pointer hover:shadow-lg hover:shadow-primary/20"
                     onClick={() => handlePlay(channel, 'channel')}
                   >
-                    <div className="relative aspect-video bg-secondary">
-                      <img src={channel.logo} alt={channel.name} className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                        <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center transform group-hover:scale-110 transition-transform duration-300 shadow-lg shadow-primary/50">
-                          <Play className="w-8 h-8 text-primary-foreground" fill="currentColor" />
+                    <div className="flex items-center p-4">
+                      {/* Channel Logo */}
+                      <div className="relative w-16 h-16 flex-shrink-0 bg-secondary rounded-lg overflow-hidden">
+                        <img 
+                          src={channel.logo} 
+                          alt={channel.name} 
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                          <Play className="w-6 h-6 text-primary-foreground" fill="currentColor" />
                         </div>
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleFavorite(channel, 'channel');
-                        }}
-                        className="absolute top-2 right-2 w-8 h-8 rounded-full bg-card/80 backdrop-blur-sm flex items-center justify-center hover:bg-card transition-all duration-200 z-10"
-                      >
-                        <Heart
-                          className={`w-4 h-4 ${
-                            isFavorite(channel.id, 'channel') ? 'fill-accent text-accent' : 'text-foreground'
-                          }`}
-                        />
-                      </button>
-                      <Badge className="absolute bottom-2 left-2 bg-red-600 hover:bg-red-600 text-white border-none">
-                        LIVE
-                      </Badge>
-                    </div>
-                    <div className="p-4">
-                      <h3 className="font-semibold text-foreground mb-2">{channel.name}</h3>
-                      {channel.epg && (
-                        <div className="space-y-1">
-                          <div className="text-xs text-foreground">
-                            <span className="text-primary">Şimdi: </span>
-                            {channel.epg.current.title}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            <span>Sonra: </span>
-                            {channel.epg.next.title}
+
+                      {/* Channel Info */}
+                      <div className="flex-1 ml-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="font-semibold text-foreground text-lg">{channel.name}</h3>
+                          <div className="flex items-center space-x-2">
+                            <Badge className="bg-red-600 hover:bg-red-600 text-white border-none">
+                              LIVE
+                            </Badge>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleFavorite(channel, 'channel');
+                              }}
+                              className="w-8 h-8 rounded-full bg-secondary/50 flex items-center justify-center hover:bg-secondary transition-all duration-200"
+                            >
+                              <Heart
+                                className={`w-4 h-4 ${
+                                  isFavorite(channel.id, 'channel') ? 'fill-accent text-accent' : 'text-muted-foreground'
+                                }`}
+                              />
+                            </button>
                           </div>
                         </div>
-                      )}
+                        {channel.epg && (
+                          <div className="space-y-1">
+                            <div className="flex items-center text-sm">
+                              <span className="text-primary font-medium mr-2">Şimdi:</span>
+                              <span className="text-foreground">{channel.epg.current.title}</span>
+                              <span className="text-muted-foreground ml-auto text-xs">{channel.epg.current.time}</span>
+                            </div>
+                            <div className="flex items-center text-sm">
+                              <span className="text-muted-foreground font-medium mr-2">Sonra:</span>
+                              <span className="text-muted-foreground">{channel.epg.next.title}</span>
+                              <span className="text-muted-foreground ml-auto text-xs">{channel.epg.next.time}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </Card>
                 ))}
