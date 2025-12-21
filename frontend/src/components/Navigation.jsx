@@ -1,8 +1,9 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
-import { Tv, Heart, Settings as SettingsIcon, LogOut, Palette, Shield, Users } from 'lucide-react';
+import { Tv, Heart, Settings as SettingsIcon, LogOut, Palette, Shield, Wifi, WifiOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
+import { Badge } from './ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,7 +14,7 @@ import {
 } from './ui/dropdown-menu';
 
 const Navigation = () => {
-  const { currentTab, setCurrentTab, logout, user, theme, changeTheme } = useApp();
+  const { currentTab, setCurrentTab, logout, user, theme, changeTheme, iptvConnected, iptvService } = useApp();
   const navigate = useNavigate();
 
   const tabs = [
@@ -46,9 +47,27 @@ const Navigation = () => {
             </div>
             <div>
               <h1 className="text-xl font-bold text-foreground">IPPL4Y</h1>
-              {user?.role && (
-                <p className="text-xs text-muted-foreground capitalize">{user.role}</p>
-              )}
+              <div className="flex items-center space-x-2">
+                {user?.role && (
+                  <p className="text-xs text-muted-foreground capitalize">{user.role}</p>
+                )}
+                {user?.role === 'user' && (
+                  <>
+                    <span className="text-muted-foreground">•</span>
+                    {iptvConnected ? (
+                      <div className="flex items-center space-x-1">
+                        <Wifi className="w-3 h-3 text-green-500" />
+                        <span className="text-xs text-green-500">IPTV Bağlı</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-1">
+                        <WifiOff className="w-3 h-3 text-amber-500" />
+                        <span className="text-xs text-amber-500">IPTV Yok</span>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
@@ -73,6 +92,13 @@ const Navigation = () => {
           </div>
 
           <div className="flex items-center space-x-2">
+            {/* IPTV Service Info (for users) */}
+            {user?.role === 'user' && iptvService && (
+              <Badge variant="outline" className="border-primary/50 text-primary">
+                {iptvService.provider.replace('provider_', '')}
+              </Badge>
+            )}
+
             {/* Theme Switcher */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -85,7 +111,7 @@ const Navigation = () => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-card border-border">
-                <DropdownMenuLabel className="text-foreground">Theme</DropdownMenuLabel>
+                <DropdownMenuLabel className="text-foreground">Tema</DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-border" />
                 <DropdownMenuItem 
                   onClick={() => changeTheme('ippl4y-prime')}
@@ -97,13 +123,13 @@ const Navigation = () => {
                   onClick={() => changeTheme('dark')}
                   className={theme === 'dark' ? 'bg-primary/10' : ''}
                 >
-                  Dark
+                  Koyu
                 </DropdownMenuItem>
                 <DropdownMenuItem 
                   onClick={() => changeTheme('light')}
                   className={theme === 'light' ? 'bg-primary/10' : ''}
                 >
-                  Light
+                  Açık
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
