@@ -136,6 +136,9 @@ export const AppProvider = ({ children }) => {
         setIptvService(serviceData);
         setIptvConnected(true);
         localStorage.setItem('ippl4yIptvService', JSON.stringify(serviceData));
+        
+        // Also store the full playlist with password for API calls
+        localStorage.setItem('ippl4yActivePlaylist', JSON.stringify(playlist));
       }
       
       return { success: true, playlists: data.playlists };
