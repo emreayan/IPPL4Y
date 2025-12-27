@@ -210,9 +210,9 @@ const DeviceSetup = () => {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Cihaz & Playlist Yönetimi</h1>
+            <h1 className="text-2xl font-bold text-foreground">Playlist Yönetimi</h1>
             <p className="text-sm text-muted-foreground">
-              Cihaz bilgilerinizi görüntüleyin ve playlistlerinizi yönetin
+              Provider'ınızdan aldığınız playlist bilgilerini buradan ekleyin
             </p>
           </div>
         </div>
