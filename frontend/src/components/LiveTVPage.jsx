@@ -268,7 +268,7 @@ const LiveTVPage = () => {
                     {/* Channel Logo */}
                     {channel.logo ? (
                       <img
-                        src={channel.logo}
+                        src={getProxiedImageUrl(channel.logo)}
                         alt={channel.name}
                         className="w-16 h-16 object-contain rounded"
                         onError={(e) => {
