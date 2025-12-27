@@ -131,6 +131,7 @@ const DeviceSetup = () => {
 
     setIsAdding(true);
 
+    // Add playlist
     const result = await addPlaylist(credentials.device_id, {
       playlist_name: newPlaylist.playlist_name,
       playlist_url: newPlaylist.playlist_url,
@@ -140,7 +141,32 @@ const DeviceSetup = () => {
     });
 
     if (result.success) {
-      setSuccess('Playlist başarıyla eklendi!');
+      const playlistId = result.playlist?.id;
+      
+      if (playlistId) {
+        // Auto-parse the playlist
+        setSuccess('Playlist eklendi, kanallar yükleniyor...');
+        
+        try {
+          const backendUrl = process.env.REACT_APP_BACKEND_URL;
+          const parseRes = await fetch(`${backendUrl}/api/playlist/parse/${playlistId}`, {
+            method: 'POST'
+          });
+          const parseData = await parseRes.json();
+          
+          if (parseData.success) {
+            setSuccess(`✓ ${parseData.total_channels || 0} kanal yüklendi!`);
+          } else {
+            setSuccess('Playlist eklendi');
+          }
+        } catch (err) {
+          console.error('Parse error:', err);
+          setSuccess('Playlist eklendi');
+        }
+      } else {
+        setSuccess('Playlist başarıyla eklendi!');
+      }
+      
       setNewPlaylist({
         playlist_name: '',
         playlist_url: '',

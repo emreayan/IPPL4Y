@@ -1132,6 +1132,86 @@ async def parse_m3u_playlist_internal(m3u_url: str, playlist_id: str):
         return {"success": False, "error": str(e)}
 
 
+async def parse_xtream_full_data(server_url: str, username: str, password: str) -> dict:
+    """Parse Xtream Codes API and get all live channels with categories"""
+    try:
+        base_url = server_url.rstrip('/')
+        
+        # Get live categories
+        categories_url = f"{base_url}/player_api.php?username={username}&password={password}&action=get_live_categories"
+        
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            cat_response = await client.get(categories_url, headers=XTREAM_HEADERS)
+            cat_response.raise_for_status()
+            categories_raw = cat_response.json()
+        
+        # Get all live streams
+        streams_url = f"{base_url}/player_api.php?username={username}&password={password}&action=get_live_streams"
+        
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            streams_response = await client.get(streams_url, headers=XTREAM_HEADERS)
+            streams_response.raise_for_status()
+            streams_raw = streams_response.json()
+        
+        # Build categories dict
+        categories_dict = {}
+        for cat in categories_raw:
+            cat_id = str(cat.get('category_id', 'uncategorized'))
+            categories_dict[cat_id] = {
+                'id': cat_id,
+                'name': cat.get('category_name', 'Uncategorized'),
+                'channels': []
+            }
+        
+        # Add default category
+        if 'uncategorized' not in categories_dict:
+            categories_dict['uncategorized'] = {
+                'id': 'uncategorized',
+                'name': 'Uncategorized',
+                'channels': []
+            }
+        
+        # Organize streams by category
+        for stream in streams_raw:
+            cat_id = str(stream.get('category_id', 'uncategorized'))
+            
+            if cat_id not in categories_dict:
+                categories_dict[cat_id] = {
+                    'id': cat_id,
+                    'name': f'Category {cat_id}',
+                    'channels': []
+                }
+            
+            # Build stream URL
+            stream_id = stream.get('stream_id')
+            extension = stream.get('container_extension', 'ts')
+            stream_url = f"{base_url}/live/{username}/{password}/{stream_id}.{extension}"
+            
+            categories_dict[cat_id]['channels'].append({
+                'id': str(stream_id),
+                'name': stream.get('name', 'Unknown'),
+                'logo': stream.get('stream_icon'),
+                'stream_url': stream_url,
+                'epg_channel_id': stream.get('epg_channel_id'),
+                'tvg_id': stream.get('epg_channel_id'),
+                'tvg_name': stream.get('name')
+            })
+        
+        sorted_categories = sorted(categories_dict.values(), key=lambda x: x['name'])
+        total_channels = sum(len(c['channels']) for c in sorted_categories)
+        
+        return {
+            "success": True,
+            "total_channels": total_channels,
+            "total_categories": len(sorted_categories),
+            "categories": sorted_categories
+        }
+        
+    except Exception as e:
+        logger.error(f"Xtream parse error: {str(e)}")
+        return {"success": False, "error": str(e)}
+
+
 @api_router.post("/playlist/parse-url")
 async def parse_playlist_url(url: str, playlist_type: str = "m3u", xtream_username: Optional[str] = None, xtream_password: Optional[str] = None, limit: Optional[int] = 100):
     """Parse a playlist URL directly without saving to database"""
