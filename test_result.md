@@ -285,10 +285,13 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Device Management API"
-    - "Playlist Management API"
-    - "Playlist Dropdown in Navigation"
-    - "Device Setup Page"
+    - "IPTV Stream Proxy API"
+    - "IPTV Image Proxy API"
+    - "IPTV Device Authentication"
+    - "IPTV Playlist Management"
+    - "IPTV Playlist Parsing"
+    - "IPTV Channel Categories API"
+    - "IPTV Channels by Category API"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -298,3 +301,5 @@ agent_communication:
     message: "Device & Playlist Management sistemi eklendi. Backend: /api/device/register, /api/device/{device_id}/playlists, /api/device/{device_id}/playlist endpoints. Frontend: DeviceSetup.jsx sayfası, Navigation'da playlist dropdown. Maks 10 playlist/cihaz. M3U ve Xtream Codes (DNS) destekleniyor."
   - agent: "testing"
     message: "IPPL4Y Device & Playlist Management API comprehensive testing completed successfully. All 22 backend API tests passed (10 Device/Playlist + 9 Logo + 3 Health Check). ✅ Device Management: Registration, validation, and format validation all working correctly. ✅ Playlist Management: M3U and Xtream playlist creation, retrieval, activation, deletion all working correctly. Maximum 10 playlist limit properly enforced. ✅ All validation and error handling working as expected with proper Turkish error messages. ✅ All response formats match specifications exactly. ✅ Backend logs show no errors. The Device & Playlist Management API is fully functional and ready for production use. Main agent can proceed with frontend integration testing or summarize and finish the implementation."
+  - agent: "testing"
+    message: "IPPL4Y IPTV Stream & Proxy Testing completed successfully. All 7 critical IPTV tests passed with real provider credentials. ✅ Stream Proxy: HTTP IPTV streams (germanyservers1.net:8080) successfully proxied through HTTPS backend with correct Content-Type: video/mp2t and CORS headers. ✅ Image Proxy: HTTP images successfully proxied with SSL verification disabled for self-signed certificates. ✅ Device Authentication: Real device credentials (11:30:02:28:02:bb/1323008583) working correctly. ✅ Playlist Management: Xtream Codes playlist (jd4bD9OQ/tJn9FewD) successfully added and managed. ✅ Playlist Parsing: 4350 channels successfully parsed from real IPTV provider with 53 categories. ✅ Channel APIs: Categories and channel retrieval working with parsed data. ✅ Mixed Content issues resolved - HTTP streams and images can be played/displayed on HTTPS frontend. All critical IPTV functionality is working correctly and ready for production use."
