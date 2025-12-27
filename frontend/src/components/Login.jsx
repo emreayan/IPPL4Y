@@ -29,8 +29,10 @@ const Login = () => {
     const result = await loginToApp(appUsername, appPassword);
     
     if (result.success) {
-      // All users go directly to home - IPTV setup is now device-based
-      navigate('/home');
+      // Check if user has active playlist
+      // If no playlist, redirect to device setup to add provider credentials
+      // If has playlist, go to home
+      navigate('/device-setup'); // First time setup or playlist management
     } else {
       setError(result.error);
     }
@@ -46,13 +48,13 @@ const Login = () => {
       )}
       
       <div className="space-y-2">
-        <Label htmlFor="username" className="text-foreground">IPPL4Y Kullanıcı Adı</Label>
+        <Label htmlFor="username" className="text-foreground">Platform Kullanıcı Adı</Label>
         <div className="relative">
           <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
             id="username"
             type="text"
-            placeholder="Kullanıcı adınızı girin"
+            placeholder="IPPL4Y üyelik kullanıcı adınız"
             value={appUsername}
             onChange={(e) => setAppUsername(e.target.value)}
             className="pl-10 bg-secondary/50 border-border text-foreground placeholder:text-muted-foreground"
@@ -62,13 +64,13 @@ const Login = () => {
       </div>
       
       <div className="space-y-2">
-        <Label htmlFor="password" className="text-foreground">IPPL4Y Şifre</Label>
+        <Label htmlFor="password" className="text-foreground">Platform Şifre</Label>
         <div className="relative">
           <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
             id="password"
             type="password"
-            placeholder="Şifrenizi girin"
+            placeholder="IPPL4Y üyelik şifreniz"
             value={appPassword}
             onChange={(e) => setAppPassword(e.target.value)}
             className="pl-10 bg-secondary/50 border-border text-foreground placeholder:text-muted-foreground"
