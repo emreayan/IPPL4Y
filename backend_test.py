@@ -12,7 +12,7 @@ from PIL import Image
 from typing import Dict, Any
 
 # Get backend URL from frontend .env
-BACKEND_URL = "https://ipplay-stream-1.preview.emergentagent.com/api"
+BACKEND_URL = "https://iptvplayer-4.preview.emergentagent.com/api"
 
 def test_post_health_check():
     """Test POST /api/health-check endpoint with multiple URLs"""
