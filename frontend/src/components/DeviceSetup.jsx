@@ -148,7 +148,14 @@ const DeviceSetup = () => {
         xtream_username: '',
         xtream_password: ''
       });
-      setTimeout(() => setSuccess(''), 3000);
+      
+      // Refresh playlists
+      await fetchPlaylists();
+      
+      // After 2 seconds, navigate to home
+      setTimeout(() => {
+        navigate('/home');
+      }, 2000);
     } else {
       setError(result.error);
     }
