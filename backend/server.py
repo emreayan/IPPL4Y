@@ -1063,14 +1063,43 @@ async def parse_and_cache_playlist(playlist_id: str):
         
         # Get playlist type - handle both 'type' and 'playlist_type' keys
         playlist_type = playlist.get("type") or playlist.get("playlist_type", "m3u")
+        playlist_url = playlist.get("url") or playlist.get("playlist_url", "")
+        
+        # Auto-detect Xtream Codes based on URL pattern
+        if not playlist_type or playlist_type == "m3u":
+            if "get.php" in playlist_url and "username=" in playlist_url and "password=" in playlist_url:
+                playlist_type = "xtream"
+                logger.info("Auto-detected Xtream Codes from URL pattern")
+        
+        logger.info(f"Parsing playlist type: {playlist_type}")
         
         # Parse based on type
         if playlist_type == "xtream":
+            # Extract or get credentials
+            xtream_username = playlist.get("username") or playlist.get("xtream_username")
+            xtream_password = playlist.get("password") or playlist.get("xtream_password")
+            
+            # If not in playlist, try to extract from URL
+            if not xtream_username or not xtream_password:
+                import re
+                username_match = re.search(r'username=([^&]+)', playlist_url)
+                password_match = re.search(r'password=([^&]+)', playlist_url)
+                
+                if username_match:
+                    xtream_username = username_match.group(1)
+                if password_match:
+                    xtream_password = password_match.group(1)
+            
+            # Extract base URL
+            base_url = playlist_url.split('/get.php')[0] if '/get.php' in playlist_url else playlist_url.split('/player_api')[0]
+            
+            logger.info(f"Xtream parsing - Base URL: {base_url}, Username: {xtream_username}")
+            
             # Xtream Codes parsing
             result = await parse_xtream_full_data(
-                playlist.get("url") or playlist.get("playlist_url", ""),
-                playlist.get("username") or playlist.get("xtream_username", ""),
-                playlist.get("password") or playlist.get("xtream_password", "")
+                base_url,
+                xtream_username,
+                xtream_password
             )
             
             if result.get("success"):
