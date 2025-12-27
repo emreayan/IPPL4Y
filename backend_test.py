@@ -1204,6 +1204,441 @@ def test_playlist_limit():
         return False
 
 
+# ==================== IPTV STREAM & PROXY TESTS ====================
+
+# IPTV Provider credentials from review request
+IPTV_SERVER_URL = "http://germanyservers1.net:8080"
+IPTV_USERNAME = "jd4bD9OQ"
+IPTV_PASSWORD = "tJn9FewD"
+
+def test_stream_proxy():
+    """Test GET /api/stream/proxy - Stream proxy for Mixed Content fix"""
+    print("\n=== Testing GET /api/stream/proxy ===")
+    
+    # Test stream URL from review request
+    test_stream_url = "http://germanyservers1.net:8080/live/jd4bD9OQ/tJn9FewD/37501.ts"
+    
+    try:
+        print(f"Testing stream proxy with URL: {test_stream_url}")
+        print(f"Sending GET request to: {BACKEND_URL}/stream/proxy")
+        
+        response = requests.get(
+            f"{BACKEND_URL}/stream/proxy",
+            params={"url": test_stream_url},
+            timeout=30,
+            stream=True  # Stream response for video content
+        )
+        
+        print(f"Response Status Code: {response.status_code}")
+        print(f"Response Headers: {dict(response.headers)}")
+        
+        if response.status_code == 200:
+            # Validate content type for video stream
+            content_type = response.headers.get('content-type', '')
+            expected_content_type = 'video/mp2t'
+            
+            if content_type != expected_content_type:
+                print(f"❌ FAIL: Expected content-type '{expected_content_type}', got: '{content_type}'")
+                return False
+            
+            # Check CORS headers
+            cors_header = response.headers.get('access-control-allow-origin', '')
+            if cors_header != '*':
+                print(f"❌ FAIL: Expected CORS header '*', got: '{cors_header}'")
+                return False
+            
+            # Check if we got some content (at least a few bytes)
+            content_length = 0
+            for chunk in response.iter_content(chunk_size=1024):
+                content_length += len(chunk)
+                if content_length > 1024:  # Got at least 1KB, that's enough for test
+                    break
+            
+            if content_length == 0:
+                print("❌ FAIL: No content received from stream proxy")
+                return False
+            
+            print(f"✅ Stream proxy working - Content-Type: {content_type}, Received: {content_length} bytes")
+            print("✅ GET /api/stream/proxy - All validations passed!")
+            return True
+            
+        elif response.status_code == 502:
+            print("❌ FAIL: 502 Bad Gateway - Stream proxy failed to connect to upstream")
+            print(f"Response: {response.text}")
+            return False
+        elif response.status_code == 520:
+            print("❌ FAIL: 520 Error - Stream proxy connection error")
+            print(f"Response: {response.text}")
+            return False
+        else:
+            print(f"❌ FAIL: HTTP {response.status_code}")
+            print(f"Response: {response.text}")
+            return False
+            
+    except requests.exceptions.RequestException as e:
+        print(f"❌ FAIL: Request failed - {str(e)}")
+        return False
+    except Exception as e:
+        print(f"❌ FAIL: Unexpected error - {str(e)}")
+        return False
+
+
+def test_image_proxy():
+    """Test GET /api/image/proxy - Image proxy for Mixed Content fix"""
+    print("\n=== Testing GET /api/image/proxy ===")
+    
+    # Test image URL from review request
+    test_image_url = "http://resim.yayins.com/kanallar/tr.png"
+    
+    try:
+        print(f"Testing image proxy with URL: {test_image_url}")
+        print(f"Sending GET request to: {BACKEND_URL}/image/proxy")
+        
+        response = requests.get(
+            f"{BACKEND_URL}/image/proxy",
+            params={"url": test_image_url},
+            timeout=30
+        )
+        
+        print(f"Response Status Code: {response.status_code}")
+        print(f"Response Headers: {dict(response.headers)}")
+        
+        if response.status_code == 200:
+            # Validate content type for image
+            content_type = response.headers.get('content-type', '')
+            expected_content_type = 'image/png'
+            
+            if content_type != expected_content_type:
+                print(f"❌ FAIL: Expected content-type '{expected_content_type}', got: '{content_type}'")
+                return False
+            
+            # Check CORS headers
+            cors_header = response.headers.get('access-control-allow-origin', '')
+            if cors_header != '*':
+                print(f"❌ FAIL: Expected CORS header '*', got: '{cors_header}'")
+                return False
+            
+            # Check content length
+            content_length = len(response.content)
+            if content_length == 0:
+                print("❌ FAIL: No content received from image proxy")
+                return False
+            
+            # Validate it's actually image content (PNG signature)
+            if not response.content.startswith(b'\x89PNG'):
+                print("❌ FAIL: Content doesn't appear to be a valid PNG image")
+                return False
+            
+            print(f"✅ Image proxy working - Content-Type: {content_type}, Size: {content_length} bytes")
+            print("✅ GET /api/image/proxy - All validations passed!")
+            return True
+            
+        elif response.status_code == 502:
+            print("❌ FAIL: 502 Bad Gateway - Image proxy failed to connect to upstream")
+            print(f"Response: {response.text}")
+            return False
+        elif response.status_code == 520:
+            print("❌ FAIL: 520 Error - Image proxy connection error")
+            print(f"Response: {response.text}")
+            return False
+        else:
+            print(f"❌ FAIL: HTTP {response.status_code}")
+            print(f"Response: {response.text}")
+            return False
+            
+    except requests.exceptions.RequestException as e:
+        print(f"❌ FAIL: Request failed - {str(e)}")
+        return False
+    except Exception as e:
+        print(f"❌ FAIL: Unexpected error - {str(e)}")
+        return False
+
+
+def test_iptv_device_register():
+    """Test device registration with IPTV credentials from review request"""
+    print("\n=== Testing IPTV Device Registration ===")
+    
+    payload = {
+        "device_id": TEST_DEVICE_ID,
+        "device_key": TEST_DEVICE_KEY,
+        "platform": "web"
+    }
+    
+    try:
+        print(f"Registering IPTV device: {TEST_DEVICE_ID}")
+        print(f"Payload: {json.dumps(payload, indent=2)}")
+        
+        response = requests.post(
+            f"{BACKEND_URL}/device/register",
+            json=payload,
+            timeout=30
+        )
+        
+        print(f"Response Status Code: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Response Data: {json.dumps(data, indent=2)}")
+            
+            if data.get('success') and data.get('device'):
+                print("✅ IPTV Device registration successful")
+                return True
+            else:
+                print(f"❌ FAIL: Device registration failed - {data}")
+                return False
+        else:
+            print(f"❌ FAIL: HTTP {response.status_code}")
+            print(f"Response: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ FAIL: Unexpected error - {str(e)}")
+        return False
+
+
+def test_iptv_playlist_add():
+    """Test adding IPTV playlist with real credentials"""
+    print("\n=== Testing IPTV Playlist Addition ===")
+    
+    payload = {
+        "playlist_name": "Test IPTV",
+        "playlist_url": IPTV_SERVER_URL,
+        "playlist_type": "xtream",
+        "xtream_username": IPTV_USERNAME,
+        "xtream_password": IPTV_PASSWORD
+    }
+    
+    try:
+        print(f"Adding IPTV playlist: {payload['playlist_name']}")
+        print(f"Server: {IPTV_SERVER_URL}")
+        print(f"Username: {IPTV_USERNAME}")
+        
+        response = requests.post(
+            f"{BACKEND_URL}/device/{TEST_DEVICE_ID}/playlist",
+            json=payload,
+            timeout=30
+        )
+        
+        print(f"Response Status Code: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Response Data: {json.dumps(data, indent=2)}")
+            
+            if data.get('success') and data.get('playlist'):
+                # Store playlist ID for later tests
+                global iptv_playlist_id
+                iptv_playlist_id = data['playlist']['id']
+                print(f"✅ IPTV Playlist added successfully - ID: {iptv_playlist_id}")
+                return True
+            else:
+                print(f"❌ FAIL: Playlist addition failed - {data}")
+                return False
+        else:
+            print(f"❌ FAIL: HTTP {response.status_code}")
+            print(f"Response: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ FAIL: Unexpected error - {str(e)}")
+        return False
+
+
+def test_iptv_playlist_parse():
+    """Test parsing IPTV playlist"""
+    print("\n=== Testing IPTV Playlist Parse ===")
+    
+    try:
+        # Use the playlist ID from the previous test
+        playlist_id = iptv_playlist_id
+        print(f"Parsing IPTV playlist: {playlist_id}")
+        
+        response = requests.post(
+            f"{BACKEND_URL}/playlist/parse/{playlist_id}",
+            timeout=120  # Longer timeout for parsing
+        )
+        
+        print(f"Response Status Code: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Response Data: {json.dumps(data, indent=2)}")
+            
+            # Validate response structure
+            required_fields = ['success', 'message', 'total_channels']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                print(f"❌ FAIL: Missing required fields: {missing_fields}")
+                return False
+            
+            if data['success'] is not True:
+                print(f"❌ FAIL: Parse failed - {data.get('message', 'Unknown error')}")
+                return False
+            
+            total_channels = data.get('total_channels', 0)
+            if total_channels == 0:
+                print("❌ FAIL: No channels found in playlist")
+                return False
+            
+            print(f"✅ IPTV Playlist parsed successfully - {total_channels} channels found")
+            return True
+            
+        else:
+            print(f"❌ FAIL: HTTP {response.status_code}")
+            print(f"Response: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ FAIL: Unexpected error - {str(e)}")
+        return False
+
+
+def test_iptv_channel_categories():
+    """Test getting channel categories"""
+    print("\n=== Testing IPTV Channel Categories ===")
+    
+    try:
+        print(f"Getting channel categories for device: {TEST_DEVICE_ID}")
+        
+        response = requests.get(
+            f"{BACKEND_URL}/channels/categories",
+            params={"device_id": TEST_DEVICE_ID},
+            timeout=30
+        )
+        
+        print(f"Response Status Code: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Response Data: {json.dumps(data, indent=2)}")
+            
+            # Validate response structure
+            required_fields = ['success', 'categories']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                print(f"❌ FAIL: Missing required fields: {missing_fields}")
+                return False
+            
+            if data['success'] is not True:
+                print(f"❌ FAIL: Categories request failed")
+                return False
+            
+            categories = data.get('categories', [])
+            if len(categories) == 0:
+                print("❌ FAIL: No categories found")
+                return False
+            
+            # Should have at least "TÜMÜ" and "FAVORİLER" categories
+            category_names = [cat.get('name', '') for cat in categories]
+            if 'TÜMÜ' not in category_names:
+                print("❌ FAIL: Missing 'TÜMÜ' category")
+                return False
+            
+            print(f"✅ Channel categories retrieved - {len(categories)} categories found")
+            return True
+            
+        else:
+            print(f"❌ FAIL: HTTP {response.status_code}")
+            print(f"Response: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ FAIL: Unexpected error - {str(e)}")
+        return False
+
+
+def test_iptv_channels_by_category():
+    """Test getting channels by category"""
+    print("\n=== Testing IPTV Channels by Category ===")
+    
+    try:
+        print(f"Getting channels for device: {TEST_DEVICE_ID}, category: all")
+        
+        response = requests.get(
+            f"{BACKEND_URL}/channels/by-category",
+            params={
+                "device_id": TEST_DEVICE_ID,
+                "category_id": "all"
+            },
+            timeout=30
+        )
+        
+        print(f"Response Status Code: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Response Data: {json.dumps(data, indent=2)}")
+            
+            # Validate response structure
+            required_fields = ['success', 'channels', 'count']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                print(f"❌ FAIL: Missing required fields: {missing_fields}")
+                return False
+            
+            if data['success'] is not True:
+                print(f"❌ FAIL: Channels request failed")
+                return False
+            
+            channels = data.get('channels', [])
+            count = data.get('count', 0)
+            
+            if len(channels) == 0:
+                print("❌ FAIL: No channels found")
+                return False
+            
+            if len(channels) != count:
+                print(f"❌ FAIL: Channel count mismatch. Expected: {count}, Got: {len(channels)}")
+                return False
+            
+            # Validate channel structure
+            first_channel = channels[0]
+            channel_required_fields = ['id', 'name', 'stream_url']
+            missing_channel_fields = [field for field in channel_required_fields if field not in first_channel]
+            
+            if missing_channel_fields:
+                print(f"❌ FAIL: Missing channel fields: {missing_channel_fields}")
+                return False
+            
+            print(f"✅ Channels retrieved successfully - {count} channels found")
+            return True
+            
+        else:
+            print(f"❌ FAIL: HTTP {response.status_code}")
+            print(f"Response: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ FAIL: Unexpected error - {str(e)}")
+        return False
+
+
+def run_iptv_tests():
+    """Run all IPTV-specific tests from review request"""
+    print("\n📺 Starting IPTV Stream & Proxy Tests")
+    print("="*60)
+    
+    iptv_results = []
+    
+    # Initialize global variable for IPTV playlist ID
+    global iptv_playlist_id
+    iptv_playlist_id = None
+    
+    # Core IPTV functionality tests
+    iptv_results.append(("GET /api/stream/proxy", test_stream_proxy()))
+    iptv_results.append(("GET /api/image/proxy", test_image_proxy()))
+    iptv_results.append(("IPTV Device Registration", test_iptv_device_register()))
+    iptv_results.append(("IPTV Playlist Addition", test_iptv_playlist_add()))
+    iptv_results.append(("IPTV Playlist Parse", test_iptv_playlist_parse()))
+    iptv_results.append(("IPTV Channel Categories", test_iptv_channel_categories()))
+    iptv_results.append(("IPTV Channels by Category", test_iptv_channels_by_category()))
+    
+    return iptv_results
+
+
 def run_device_playlist_tests():
     """Run all device and playlist management tests"""
     print("\n📱 Starting Device & Playlist Management API Tests")
