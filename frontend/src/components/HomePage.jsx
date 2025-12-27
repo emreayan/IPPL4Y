@@ -7,7 +7,7 @@ const HomePage = () => {
   const navigate = useNavigate();
   const { user, currentPlaylist, playlists } = useApp();
   const [showSuccess, setShowSuccess] = useState(true);
-  const [showWarning, setShowWarning] = useState(!currentPlaylist);
+  const [showWarning, setShowWarning] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setShowSuccess(false), 5000);
@@ -15,8 +15,13 @@ const HomePage = () => {
   }, []);
 
   useEffect(() => {
-    setShowWarning(!currentPlaylist);
-  }, [currentPlaylist]);
+    // Only show warning if we have explicitly checked and no playlist exists
+    if (playlists !== undefined && playlists.length === 0) {
+      setShowWarning(true);
+    } else {
+      setShowWarning(false);
+    }
+  }, [playlists]);
 
   const mainCategories = [
     {

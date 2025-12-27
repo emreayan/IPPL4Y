@@ -29,10 +29,11 @@ const Login = () => {
     const result = await loginToApp(appUsername, appPassword);
     
     if (result.success) {
-      // Check if user has active playlist
-      // If no playlist, redirect to device setup to add provider credentials
-      // If has playlist, go to home
-      navigate('/device-setup'); // First time setup or playlist management
+      // After successful login, check if user has playlists
+      // If yes, go to home; if no, go to device setup
+      // For now, always go to device-setup first time, then user can navigate
+      // We'll let the HomePage check and show warning if no playlist
+      navigate('/home');
     } else {
       setError(result.error);
     }

@@ -204,7 +204,7 @@ const DeviceSetup = () => {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate(-1)}
+            onClick={() => navigate('/home')}
             className="text-muted-foreground hover:text-foreground mr-4"
           >
             <ArrowLeft className="w-5 h-5" />
