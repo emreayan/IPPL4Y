@@ -1259,6 +1259,201 @@ async def get_xtream_full_data(server_url: str, username: str, password: str, in
             "categories": []
         }
 
+
+# ==================== LIVE TV & CHANNELS ENDPOINTS ====================
+
+@api_router.get("/channels/categories")
+async def get_channel_categories(device_id: str):
+    """Get channel categories with count for the active playlist"""
+    try:
+        # Find active playlist for device
+        active_playlist = await db.playlists.find_one(
+            {"device_id": device_id, "is_active": True},
+            {"_id": 0}
+        )
+        
+        if not active_playlist:
+            return {
+                "success": False,
+                "message": "Aktif playlist bulunamadı",
+                "categories": []
+            }
+        
+        playlist_id = active_playlist['id']
+        
+        # Check if we have cached parsed data
+        cached = await db.parsed_playlists.find_one(
+            {"playlist_id": playlist_id},
+            {"_id": 0}
+        )
+        
+        if cached:
+            categories = cached.get('categories', [])
+            
+            # Build category summary with counts
+            category_summary = []
+            total_channels = 0
+            
+            for cat in categories:
+                channel_count = len(cat.get('channels', []))
+                total_channels += channel_count
+                category_summary.append({
+                    "id": cat.get('id'),
+                    "name": cat.get('name'),
+                    "count": channel_count
+                })
+            
+            # Add "all" category
+            result = [
+                {"id": "all", "name": "TÜMÜ", "count": total_channels},
+                {"id": "favorites", "name": "FAVORİLER", "count": 0},
+            ] + category_summary
+            
+            return {
+                "success": True,
+                "categories": result,
+                "total_channels": total_channels
+            }
+        
+        # If not cached, trigger parse first
+        return {
+            "success": False,
+            "message": "Playlist henüz parse edilmedi",
+            "categories": []
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting categories: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/channels/by-category")
+async def get_channels_by_category(
+    device_id: str,
+    category_id: Optional[str] = "all",
+    search: Optional[str] = None
+):
+    """Get channels filtered by category"""
+    try:
+        # Find active playlist
+        active_playlist = await db.playlists.find_one(
+            {"device_id": device_id, "is_active": True},
+            {"_id": 0}
+        )
+        
+        if not active_playlist:
+            return {
+                "success": False,
+                "message": "Aktif playlist bulunamadı",
+                "channels": []
+            }
+        
+        playlist_id = active_playlist['id']
+        
+        # Get cached parsed data
+        cached = await db.parsed_playlists.find_one(
+            {"playlist_id": playlist_id},
+            {"_id": 0}
+        )
+        
+        if not cached:
+            return {
+                "success": False,
+                "message": "Playlist parse edilmedi",
+                "channels": []
+            }
+        
+        categories = cached.get('categories', [])
+        
+        # Filter by category
+        if category_id == "all":
+            # Flatten all channels
+            all_channels = []
+            for cat in categories:
+                all_channels.extend(cat.get('channels', []))
+            channels = all_channels
+        elif category_id == "favorites":
+            # TODO: Get user favorites from DB
+            channels = []
+        else:
+            # Find specific category
+            matching_cat = next((c for c in categories if c.get('id') == category_id), None)
+            if matching_cat:
+                channels = matching_cat.get('channels', [])
+            else:
+                channels = []
+        
+        # Apply search filter
+        if search:
+            search_lower = search.lower()
+            channels = [
+                ch for ch in channels
+                if search_lower in ch.get('name', '').lower()
+            ]
+        
+        return {
+            "success": True,
+            "channels": channels,
+            "count": len(channels)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting channels: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/channels/stream/{channel_id}")
+async def get_channel_stream(channel_id: str, device_id: str):
+    """Get stream URL for a specific channel"""
+    try:
+        # Find active playlist
+        active_playlist = await db.playlists.find_one(
+            {"device_id": device_id, "is_active": True},
+            {"_id": 0}
+        )
+        
+        if not active_playlist:
+            raise HTTPException(status_code=404, detail="Aktif playlist bulunamadı")
+        
+        playlist_id = active_playlist['id']
+        
+        # Get cached data
+        cached = await db.parsed_playlists.find_one(
+            {"playlist_id": playlist_id},
+            {"_id": 0}
+        )
+        
+        if not cached:
+            raise HTTPException(status_code=404, detail="Playlist parse edilmedi")
+        
+        # Find channel in categories
+        categories = cached.get('categories', [])
+        channel = None
+        
+        for cat in categories:
+            for ch in cat.get('channels', []):
+                if ch.get('id') == channel_id:
+                    channel = ch
+                    break
+            if channel:
+                break
+        
+        if not channel:
+            raise HTTPException(status_code=404, detail="Kanal bulunamadı")
+        
+        return {
+            "success": True,
+            "channel": channel,
+            "stream_url": channel.get('stream_url')
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting stream: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Include the router in the main app
 app.include_router(api_router)
 
