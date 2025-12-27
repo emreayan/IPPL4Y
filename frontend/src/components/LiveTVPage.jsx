@@ -19,6 +19,20 @@ const LiveTVPage = () => {
   const [error, setError] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [clickTimeout, setClickTimeout] = useState(null);
+  
+  const backendUrl = process.env.REACT_APP_BACKEND_URL;
+  
+  // Helper function to proxy image URLs
+  const getProxiedImageUrl = (url) => {
+    if (!url) return null;
+    // If it's already HTTPS, use directly
+    if (url.startsWith('https://')) return url;
+    // If it's HTTP, proxy it
+    if (url.startsWith('http://')) {
+      return `${backendUrl}/api/image/proxy?url=${encodeURIComponent(url)}`;
+    }
+    return url;
+  };
 
   useEffect(() => {
     if (deviceInfo?.device_id) {
