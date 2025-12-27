@@ -242,15 +242,27 @@ const LiveTVPage = () => {
         </div>
 
         {/* Right - Player Area */}
-        <div className="w-96 bg-black flex items-center justify-center">
+        <div className="w-96 bg-black">
           {selectedChannel ? (
-            <div className="text-center p-6">
-              <p className="text-gray-400 mb-4">Player hazırlanıyor...</p>
-              <p className="text-sm text-gray-500">{selectedChannel.name}</p>
-            </div>
+            selectedChannel.stream_url ? (
+              <VideoPlayer
+                streamUrl={selectedChannel.stream_url}
+                channelName={selectedChannel.name}
+                onClose={() => setSelectedChannel(null)}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center p-6">
+                  <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-4" />
+                  <p className="text-gray-400">Stream hazırlanıyor...</p>
+                </div>
+              </div>
+            )
           ) : (
-            <div className="text-center p-6">
-              <p className="text-gray-400">Oynamak için bir kanal seçin</p>
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center p-6">
+                <p className="text-gray-400">Oynamak için bir kanal seçin</p>
+              </div>
             </div>
           )}
         </div>
