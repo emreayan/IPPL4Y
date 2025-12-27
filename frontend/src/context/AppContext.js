@@ -445,6 +445,7 @@ export const AppProvider = ({ children }) => {
         deviceInfo,
         playlists,
         activePlaylist,
+        currentPlaylist: activePlaylist,
         playlistsLoading,
         getDeviceCredentials,
         registerDevice,
