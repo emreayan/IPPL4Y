@@ -8,6 +8,8 @@ import HomePage from "./components/HomePage";
 import LiveTVPage from "./components/LiveTVPage";
 import MoviesPage from "./components/MoviesPage";
 import MovieDetailPage from "./components/MovieDetailPage";
+import SeriesPage from "./components/SeriesPage";
+import SeriesDetailPage from "./components/SeriesDetailPage";
 import Player from "./components/Player";
 import BouquetSettings from "./components/BouquetSettings";
 import AdminPanel from "./components/AdminPanel";
