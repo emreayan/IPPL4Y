@@ -69,7 +69,15 @@ function AppRoutes() {
           path="/series"
           element={
             <ProtectedRoute>
-              <HomePage />
+              <SeriesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/series/:seriesId"
+          element={
+            <ProtectedRoute>
+              <SeriesDetailPage />
             </ProtectedRoute>
           }
         />
