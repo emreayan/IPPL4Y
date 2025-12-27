@@ -5,6 +5,7 @@ import { Search, Loader2, AlertCircle } from 'lucide-react';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Alert, AlertDescription } from './ui/alert';
+import VideoPlayer from './VideoPlayer';
 
 const LiveTVPage = () => {
   const navigate = useNavigate();
@@ -75,8 +76,25 @@ const LiveTVPage = () => {
     loadChannels();
   };
 
-  const handleChannelSelect = (channel) => {
+  const handleChannelSelect = async (channel) => {
     setSelectedChannel(channel);
+    // Fetch stream URL
+    try {
+      const backendUrl = process.env.REACT_APP_BACKEND_URL;
+      const response = await fetch(
+        `${backendUrl}/api/channels/stream/${channel.id}?device_id=${deviceInfo.device_id}`
+      );
+      const data = await response.json();
+      
+      if (data.success) {
+        setSelectedChannel({
+          ...channel,
+          stream_url: data.stream_url
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching stream:', err);
+    }
   };
 
   if (!currentPlaylist) {
