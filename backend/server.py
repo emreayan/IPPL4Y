@@ -1839,6 +1839,713 @@ async def proxy_image(url: str):
         raise HTTPException(status_code=500, detail=f"Image proxy error: {str(e)}")
 
 
+# ==================== VOD (MOVIES & SERIES) ENDPOINTS ====================
+
+# OMDb API Key
+OMDB_API_KEY = "fac22cba"
+
+async def fetch_omdb_data(title: str, year: str = None) -> dict:
+    """Fetch movie/series metadata from OMDb API"""
+    try:
+        params = {"apikey": OMDB_API_KEY, "t": title}
+        if year:
+            params["y"] = year
+        
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get("http://www.omdbapi.com/", params=params)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("Response") == "True":
+                    return {
+                        "imdb_id": data.get("imdbID"),
+                        "imdb_rating": data.get("imdbRating"),
+                        "plot": data.get("Plot"),
+                        "genre": data.get("Genre"),
+                        "director": data.get("Director"),
+                        "actors": data.get("Actors"),
+                        "runtime": data.get("Runtime"),
+                        "year": data.get("Year"),
+                        "poster": data.get("Poster") if data.get("Poster") != "N/A" else None,
+                        "awards": data.get("Awards"),
+                        "country": data.get("Country"),
+                        "language": data.get("Language"),
+                        "box_office": data.get("BoxOffice"),
+                        "production": data.get("Production"),
+                        "rated": data.get("Rated"),
+                    }
+        return {}
+    except Exception as e:
+        logger.error(f"OMDb API error: {e}")
+        return {}
+
+
+async def search_youtube_trailer(title: str, year: str = None) -> str:
+    """Generate YouTube search URL for movie trailer"""
+    search_query = f"{title}"
+    if year:
+        search_query += f" {year}"
+    search_query += " official trailer"
+    
+    # URL encode the search query
+    from urllib.parse import quote
+    return f"https://www.youtube.com/results?search_query={quote(search_query)}"
+
+
+@api_router.get("/vod/movies/categories")
+async def get_movie_categories(device_id: str):
+    """Get VOD movie categories from active playlist"""
+    try:
+        # Find active playlist
+        active_playlist = await db.playlists.find_one(
+            {"device_id": device_id, "is_active": True},
+            {"_id": 0}
+        )
+        
+        if not active_playlist:
+            return {"success": False, "message": "Aktif playlist bulunamadı", "categories": []}
+        
+        playlist_id = active_playlist['id']
+        playlist_type = active_playlist.get('playlist_type', 'xtream')
+        
+        # Check if we have cached VOD data
+        cached = await db.vod_cache.find_one(
+            {"playlist_id": playlist_id, "type": "movies"},
+            {"_id": 0}
+        )
+        
+        if cached and cached.get('categories'):
+            return {
+                "success": True,
+                "categories": cached['categories'],
+                "total_movies": cached.get('total_movies', 0)
+            }
+        
+        # If not cached, fetch from Xtream API
+        if playlist_type == 'xtream':
+            server_url = active_playlist.get('playlist_url', '').rstrip('/')
+            username = active_playlist.get('xtream_username', '')
+            password = active_playlist.get('xtream_password', '')
+            
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                # Get VOD categories
+                cat_url = f"{server_url}/player_api.php?username={username}&password={password}&action=get_vod_categories"
+                cat_response = await client.get(cat_url, headers=XTREAM_HEADERS)
+                
+                if cat_response.status_code != 200:
+                    return {"success": False, "message": "Film kategorileri alınamadı", "categories": []}
+                
+                categories_raw = cat_response.json()
+                
+                # Format categories
+                categories = [
+                    {
+                        "id": str(cat.get('category_id', '')),
+                        "name": cat.get('category_name', 'Uncategorized'),
+                        "parent_id": str(cat.get('parent_id', 0))
+                    }
+                    for cat in categories_raw
+                ]
+                
+                # Cache the categories
+                await db.vod_cache.update_one(
+                    {"playlist_id": playlist_id, "type": "movies"},
+                    {"$set": {
+                        "categories": categories,
+                        "cached_at": datetime.now(timezone.utc).isoformat()
+                    }},
+                    upsert=True
+                )
+                
+                return {
+                    "success": True,
+                    "categories": categories,
+                    "total_categories": len(categories)
+                }
+        
+        return {"success": False, "message": "Desteklenmeyen playlist tipi", "categories": []}
+        
+    except Exception as e:
+        logger.error(f"Error getting movie categories: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/vod/movies")
+async def get_movies(
+    device_id: str, 
+    category_id: str = "all", 
+    search: str = None,
+    page: int = 1,
+    limit: int = 50
+):
+    """Get movies list from active playlist"""
+    try:
+        # Find active playlist
+        active_playlist = await db.playlists.find_one(
+            {"device_id": device_id, "is_active": True},
+            {"_id": 0}
+        )
+        
+        if not active_playlist:
+            return {"success": False, "message": "Aktif playlist bulunamadı", "movies": []}
+        
+        playlist_id = active_playlist['id']
+        playlist_type = active_playlist.get('playlist_type', 'xtream')
+        
+        if playlist_type == 'xtream':
+            server_url = active_playlist.get('playlist_url', '').rstrip('/')
+            username = active_playlist.get('xtream_username', '')
+            password = active_playlist.get('xtream_password', '')
+            
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                # Get VOD streams
+                vod_url = f"{server_url}/player_api.php?username={username}&password={password}&action=get_vod_streams"
+                if category_id != "all":
+                    vod_url += f"&category_id={category_id}"
+                
+                vod_response = await client.get(vod_url, headers=XTREAM_HEADERS)
+                
+                if vod_response.status_code != 200:
+                    return {"success": False, "message": "Filmler alınamadı", "movies": []}
+                
+                movies_raw = vod_response.json()
+                
+                # Format movies
+                movies = []
+                for movie in movies_raw:
+                    stream_id = movie.get('stream_id', '')
+                    container_ext = movie.get('container_extension', 'mp4')
+                    
+                    movies.append({
+                        "id": str(stream_id),
+                        "name": movie.get('name', 'Unknown'),
+                        "poster": movie.get('stream_icon', ''),
+                        "rating": movie.get('rating', ''),
+                        "rating_5based": movie.get('rating_5based', 0),
+                        "year": movie.get('year', ''),
+                        "category_id": str(movie.get('category_id', '')),
+                        "container_extension": container_ext,
+                        "stream_url": f"{server_url}/movie/{username}/{password}/{stream_id}.{container_ext}",
+                        "added": movie.get('added', ''),
+                        "tmdb_id": movie.get('tmdb_id', ''),
+                    })
+                
+                # Apply search filter
+                if search:
+                    search_lower = search.lower()
+                    movies = [m for m in movies if search_lower in m.get('name', '').lower()]
+                
+                # Apply pagination
+                total = len(movies)
+                start = (page - 1) * limit
+                end = start + limit
+                paginated_movies = movies[start:end]
+                
+                return {
+                    "success": True,
+                    "movies": paginated_movies,
+                    "total": total,
+                    "page": page,
+                    "pages": (total + limit - 1) // limit
+                }
+        
+        return {"success": False, "message": "Desteklenmeyen playlist tipi", "movies": []}
+        
+    except Exception as e:
+        logger.error(f"Error getting movies: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/vod/movie/{movie_id}")
+async def get_movie_detail(movie_id: str, device_id: str):
+    """Get detailed movie info with OMDb enrichment"""
+    try:
+        # Find active playlist
+        active_playlist = await db.playlists.find_one(
+            {"device_id": device_id, "is_active": True},
+            {"_id": 0}
+        )
+        
+        if not active_playlist:
+            raise HTTPException(status_code=404, detail="Aktif playlist bulunamadı")
+        
+        playlist_type = active_playlist.get('playlist_type', 'xtream')
+        
+        if playlist_type == 'xtream':
+            server_url = active_playlist.get('playlist_url', '').rstrip('/')
+            username = active_playlist.get('xtream_username', '')
+            password = active_playlist.get('xtream_password', '')
+            
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                # Get VOD info
+                info_url = f"{server_url}/player_api.php?username={username}&password={password}&action=get_vod_info&vod_id={movie_id}"
+                info_response = await client.get(info_url, headers=XTREAM_HEADERS)
+                
+                if info_response.status_code != 200:
+                    raise HTTPException(status_code=404, detail="Film bilgisi alınamadı")
+                
+                data = info_response.json()
+                info = data.get('info', {})
+                movie_data = data.get('movie_data', {})
+                
+                container_ext = movie_data.get('container_extension', 'mp4')
+                stream_id = movie_data.get('stream_id', movie_id)
+                
+                movie = {
+                    "id": str(stream_id),
+                    "name": info.get('name') or movie_data.get('name', 'Unknown'),
+                    "poster": info.get('movie_image') or info.get('cover_big') or movie_data.get('stream_icon', ''),
+                    "backdrop": info.get('backdrop_path', [None])[0] if isinstance(info.get('backdrop_path'), list) else info.get('backdrop_path'),
+                    "plot": info.get('plot', ''),
+                    "cast": info.get('cast', ''),
+                    "director": info.get('director', ''),
+                    "genre": info.get('genre', ''),
+                    "release_date": info.get('releasedate', ''),
+                    "year": info.get('year', '') or movie_data.get('year', ''),
+                    "duration": info.get('duration', ''),
+                    "duration_secs": info.get('duration_secs', 0),
+                    "rating": info.get('rating', '') or movie_data.get('rating', ''),
+                    "tmdb_id": info.get('tmdb_id', ''),
+                    "youtube_trailer": info.get('youtube_trailer', ''),
+                    "container_extension": container_ext,
+                    "stream_url": f"{server_url}/movie/{username}/{password}/{stream_id}.{container_ext}",
+                    "bitrate": movie_data.get('bitrate', 0),
+                    "added": movie_data.get('added', ''),
+                }
+                
+                # Enrich with OMDb data if we don't have enough info
+                if not movie['plot'] or not movie['director']:
+                    omdb_data = await fetch_omdb_data(movie['name'], movie.get('year'))
+                    if omdb_data:
+                        movie['plot'] = movie['plot'] or omdb_data.get('plot', '')
+                        movie['director'] = movie['director'] or omdb_data.get('director', '')
+                        movie['cast'] = movie['cast'] or omdb_data.get('actors', '')
+                        movie['genre'] = movie['genre'] or omdb_data.get('genre', '')
+                        movie['imdb_rating'] = omdb_data.get('imdb_rating')
+                        movie['imdb_id'] = omdb_data.get('imdb_id')
+                        movie['runtime'] = omdb_data.get('runtime')
+                        movie['awards'] = omdb_data.get('awards')
+                        movie['country'] = omdb_data.get('country')
+                        movie['language'] = omdb_data.get('language')
+                        if not movie['poster'] and omdb_data.get('poster'):
+                            movie['poster'] = omdb_data['poster']
+                
+                # Generate YouTube trailer search if not available
+                if not movie['youtube_trailer']:
+                    movie['trailer_search_url'] = await search_youtube_trailer(movie['name'], movie.get('year'))
+                
+                return {
+                    "success": True,
+                    "movie": movie
+                }
+        
+        raise HTTPException(status_code=400, detail="Desteklenmeyen playlist tipi")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting movie detail: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== SERIES ENDPOINTS ====================
+
+@api_router.get("/vod/series/categories")
+async def get_series_categories(device_id: str):
+    """Get VOD series categories from active playlist"""
+    try:
+        # Find active playlist
+        active_playlist = await db.playlists.find_one(
+            {"device_id": device_id, "is_active": True},
+            {"_id": 0}
+        )
+        
+        if not active_playlist:
+            return {"success": False, "message": "Aktif playlist bulunamadı", "categories": []}
+        
+        playlist_id = active_playlist['id']
+        playlist_type = active_playlist.get('playlist_type', 'xtream')
+        
+        if playlist_type == 'xtream':
+            server_url = active_playlist.get('playlist_url', '').rstrip('/')
+            username = active_playlist.get('xtream_username', '')
+            password = active_playlist.get('xtream_password', '')
+            
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                # Get Series categories
+                cat_url = f"{server_url}/player_api.php?username={username}&password={password}&action=get_series_categories"
+                cat_response = await client.get(cat_url, headers=XTREAM_HEADERS)
+                
+                if cat_response.status_code != 200:
+                    return {"success": False, "message": "Dizi kategorileri alınamadı", "categories": []}
+                
+                categories_raw = cat_response.json()
+                
+                # Format categories
+                categories = [
+                    {
+                        "id": str(cat.get('category_id', '')),
+                        "name": cat.get('category_name', 'Uncategorized'),
+                        "parent_id": str(cat.get('parent_id', 0))
+                    }
+                    for cat in categories_raw
+                ]
+                
+                return {
+                    "success": True,
+                    "categories": categories,
+                    "total_categories": len(categories)
+                }
+        
+        return {"success": False, "message": "Desteklenmeyen playlist tipi", "categories": []}
+        
+    except Exception as e:
+        logger.error(f"Error getting series categories: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/vod/series")
+async def get_series(
+    device_id: str, 
+    category_id: str = "all", 
+    search: str = None,
+    page: int = 1,
+    limit: int = 50
+):
+    """Get series list from active playlist"""
+    try:
+        # Find active playlist
+        active_playlist = await db.playlists.find_one(
+            {"device_id": device_id, "is_active": True},
+            {"_id": 0}
+        )
+        
+        if not active_playlist:
+            return {"success": False, "message": "Aktif playlist bulunamadı", "series": []}
+        
+        playlist_type = active_playlist.get('playlist_type', 'xtream')
+        
+        if playlist_type == 'xtream':
+            server_url = active_playlist.get('playlist_url', '').rstrip('/')
+            username = active_playlist.get('xtream_username', '')
+            password = active_playlist.get('xtream_password', '')
+            
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                # Get Series streams
+                series_url = f"{server_url}/player_api.php?username={username}&password={password}&action=get_series"
+                if category_id != "all":
+                    series_url += f"&category_id={category_id}"
+                
+                series_response = await client.get(series_url, headers=XTREAM_HEADERS)
+                
+                if series_response.status_code != 200:
+                    return {"success": False, "message": "Diziler alınamadı", "series": []}
+                
+                series_raw = series_response.json()
+                
+                # Format series
+                series_list = []
+                for series in series_raw:
+                    series_list.append({
+                        "id": str(series.get('series_id', '')),
+                        "name": series.get('name', 'Unknown'),
+                        "poster": series.get('cover', ''),
+                        "rating": series.get('rating', ''),
+                        "rating_5based": series.get('rating_5based', 0),
+                        "year": series.get('year', ''),
+                        "category_id": str(series.get('category_id', '')),
+                        "plot": series.get('plot', ''),
+                        "cast": series.get('cast', ''),
+                        "director": series.get('director', ''),
+                        "genre": series.get('genre', ''),
+                        "last_modified": series.get('last_modified', ''),
+                        "backdrop_path": series.get('backdrop_path', []),
+                    })
+                
+                # Apply search filter
+                if search:
+                    search_lower = search.lower()
+                    series_list = [s for s in series_list if search_lower in s.get('name', '').lower()]
+                
+                # Apply pagination
+                total = len(series_list)
+                start = (page - 1) * limit
+                end = start + limit
+                paginated_series = series_list[start:end]
+                
+                return {
+                    "success": True,
+                    "series": paginated_series,
+                    "total": total,
+                    "page": page,
+                    "pages": (total + limit - 1) // limit
+                }
+        
+        return {"success": False, "message": "Desteklenmeyen playlist tipi", "series": []}
+        
+    except Exception as e:
+        logger.error(f"Error getting series: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/vod/series/{series_id}")
+async def get_series_detail(series_id: str, device_id: str):
+    """Get detailed series info with seasons and episodes"""
+    try:
+        # Find active playlist
+        active_playlist = await db.playlists.find_one(
+            {"device_id": device_id, "is_active": True},
+            {"_id": 0}
+        )
+        
+        if not active_playlist:
+            raise HTTPException(status_code=404, detail="Aktif playlist bulunamadı")
+        
+        playlist_type = active_playlist.get('playlist_type', 'xtream')
+        
+        if playlist_type == 'xtream':
+            server_url = active_playlist.get('playlist_url', '').rstrip('/')
+            username = active_playlist.get('xtream_username', '')
+            password = active_playlist.get('xtream_password', '')
+            
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                # Get Series info
+                info_url = f"{server_url}/player_api.php?username={username}&password={password}&action=get_series_info&series_id={series_id}"
+                info_response = await client.get(info_url, headers=XTREAM_HEADERS)
+                
+                if info_response.status_code != 200:
+                    raise HTTPException(status_code=404, detail="Dizi bilgisi alınamadı")
+                
+                data = info_response.json()
+                info = data.get('info', {})
+                episodes_data = data.get('episodes', {})
+                
+                # Format seasons and episodes
+                seasons = []
+                for season_num, episodes in episodes_data.items():
+                    season_episodes = []
+                    for ep in episodes:
+                        container_ext = ep.get('container_extension', 'mp4')
+                        ep_id = ep.get('id', '')
+                        
+                        season_episodes.append({
+                            "id": str(ep_id),
+                            "episode_num": ep.get('episode_num', 0),
+                            "title": ep.get('title', f"Bölüm {ep.get('episode_num', '')}"),
+                            "plot": ep.get('plot', ''),
+                            "duration": ep.get('duration', ''),
+                            "duration_secs": ep.get('duration_secs', 0),
+                            "poster": ep.get('info', {}).get('movie_image', ''),
+                            "rating": ep.get('rating', ''),
+                            "container_extension": container_ext,
+                            "stream_url": f"{server_url}/series/{username}/{password}/{ep_id}.{container_ext}",
+                            "added": ep.get('added', ''),
+                        })
+                    
+                    # Sort episodes by episode number
+                    season_episodes.sort(key=lambda x: x['episode_num'])
+                    
+                    seasons.append({
+                        "season_number": int(season_num) if season_num.isdigit() else season_num,
+                        "episode_count": len(season_episodes),
+                        "episodes": season_episodes
+                    })
+                
+                # Sort seasons
+                seasons.sort(key=lambda x: x['season_number'] if isinstance(x['season_number'], int) else 0)
+                
+                series = {
+                    "id": str(series_id),
+                    "name": info.get('name', 'Unknown'),
+                    "poster": info.get('cover', ''),
+                    "backdrop": info.get('backdrop_path', [None])[0] if isinstance(info.get('backdrop_path'), list) else info.get('backdrop_path'),
+                    "plot": info.get('plot', ''),
+                    "cast": info.get('cast', ''),
+                    "director": info.get('director', ''),
+                    "genre": info.get('genre', ''),
+                    "release_date": info.get('releaseDate', ''),
+                    "year": info.get('year', ''),
+                    "rating": info.get('rating', ''),
+                    "youtube_trailer": info.get('youtube_trailer', ''),
+                    "episode_run_time": info.get('episode_run_time', ''),
+                    "seasons": seasons,
+                    "total_seasons": len(seasons),
+                    "total_episodes": sum(s['episode_count'] for s in seasons),
+                }
+                
+                # Enrich with OMDb data if needed
+                if not series['plot'] or not series['director']:
+                    omdb_data = await fetch_omdb_data(series['name'], series.get('year'))
+                    if omdb_data:
+                        series['plot'] = series['plot'] or omdb_data.get('plot', '')
+                        series['director'] = series['director'] or omdb_data.get('director', '')
+                        series['cast'] = series['cast'] or omdb_data.get('actors', '')
+                        series['genre'] = series['genre'] or omdb_data.get('genre', '')
+                        series['imdb_rating'] = omdb_data.get('imdb_rating')
+                        series['imdb_id'] = omdb_data.get('imdb_id')
+                        series['awards'] = omdb_data.get('awards')
+                        series['country'] = omdb_data.get('country')
+                        series['language'] = omdb_data.get('language')
+                
+                # Generate YouTube trailer search if not available
+                if not series['youtube_trailer']:
+                    series['trailer_search_url'] = await search_youtube_trailer(series['name'], series.get('year'))
+                
+                return {
+                    "success": True,
+                    "series": series
+                }
+        
+        raise HTTPException(status_code=400, detail="Desteklenmeyen playlist tipi")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting series detail: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== WATCHLIST & CONTINUE WATCHING ====================
+
+@api_router.get("/user/watchlist")
+async def get_watchlist(device_id: str):
+    """Get user's watchlist"""
+    try:
+        watchlist = await db.watchlist.find_one(
+            {"device_id": device_id},
+            {"_id": 0}
+        )
+        
+        return {
+            "success": True,
+            "movies": watchlist.get('movies', []) if watchlist else [],
+            "series": watchlist.get('series', []) if watchlist else []
+        }
+    except Exception as e:
+        logger.error(f"Error getting watchlist: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class WatchlistItem(BaseModel):
+    item_id: str
+    item_type: str  # 'movie' or 'series'
+    name: str
+    poster: str = ""
+    year: str = ""
+
+
+@api_router.post("/user/watchlist/add")
+async def add_to_watchlist(device_id: str, item: WatchlistItem):
+    """Add item to watchlist"""
+    try:
+        key = 'movies' if item.item_type == 'movie' else 'series'
+        item_data = {
+            "id": item.item_id,
+            "name": item.name,
+            "poster": item.poster,
+            "year": item.year,
+            "added_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        await db.watchlist.update_one(
+            {"device_id": device_id},
+            {"$addToSet": {key: item_data}},
+            upsert=True
+        )
+        
+        return {"success": True, "message": "İzleme listesine eklendi"}
+    except Exception as e:
+        logger.error(f"Error adding to watchlist: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/user/watchlist/remove")
+async def remove_from_watchlist(device_id: str, item_id: str, item_type: str):
+    """Remove item from watchlist"""
+    try:
+        key = 'movies' if item_type == 'movie' else 'series'
+        
+        await db.watchlist.update_one(
+            {"device_id": device_id},
+            {"$pull": {key: {"id": item_id}}}
+        )
+        
+        return {"success": True, "message": "İzleme listesinden kaldırıldı"}
+    except Exception as e:
+        logger.error(f"Error removing from watchlist: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/user/continue-watching")
+async def get_continue_watching(device_id: str):
+    """Get user's continue watching list"""
+    try:
+        continue_watching = await db.continue_watching.find(
+            {"device_id": device_id},
+            {"_id": 0}
+        ).sort("last_watched", -1).limit(20).to_list(20)
+        
+        return {
+            "success": True,
+            "items": continue_watching
+        }
+    except Exception as e:
+        logger.error(f"Error getting continue watching: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class ContinueWatchingItem(BaseModel):
+    item_id: str
+    item_type: str  # 'movie', 'series_episode'
+    name: str
+    poster: str = ""
+    progress_seconds: int = 0
+    duration_seconds: int = 0
+    series_id: str = None
+    season_number: int = None
+    episode_number: int = None
+    episode_title: str = ""
+
+
+@api_router.post("/user/continue-watching/update")
+async def update_continue_watching(device_id: str, item: ContinueWatchingItem):
+    """Update continue watching progress"""
+    try:
+        # Calculate progress percentage
+        progress_percent = (item.progress_seconds / item.duration_seconds * 100) if item.duration_seconds > 0 else 0
+        
+        # If progress is > 95%, remove from continue watching (finished)
+        if progress_percent > 95:
+            await db.continue_watching.delete_one({
+                "device_id": device_id,
+                "item_id": item.item_id
+            })
+            return {"success": True, "message": "İzleme tamamlandı"}
+        
+        # Otherwise update progress
+        await db.continue_watching.update_one(
+            {"device_id": device_id, "item_id": item.item_id},
+            {"$set": {
+                "item_type": item.item_type,
+                "name": item.name,
+                "poster": item.poster,
+                "progress_seconds": item.progress_seconds,
+                "duration_seconds": item.duration_seconds,
+                "progress_percent": round(progress_percent, 1),
+                "series_id": item.series_id,
+                "season_number": item.season_number,
+                "episode_number": item.episode_number,
+                "episode_title": item.episode_title,
+                "last_watched": datetime.now(timezone.utc).isoformat()
+            }},
+            upsert=True
+        )
+        
+        return {"success": True, "message": "İlerleme kaydedildi"}
+    except Exception as e:
+        logger.error(f"Error updating continue watching: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Include the router in the main app
 app.include_router(api_router)
 
