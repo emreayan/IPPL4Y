@@ -5,9 +5,11 @@ import { Tv, Film, Clapperboard, List, Grid3x3, History, Download } from 'lucide
 
 const HomePage = () => {
   const navigate = useNavigate();
-  const { user, currentPlaylist, playlists } = useApp();
+  const { user, currentPlaylist, playlists, deviceInfo } = useApp();
   const [showSuccess, setShowSuccess] = useState(true);
   const [showWarning, setShowWarning] = useState(false);
+  const [downloading, setDownloading] = useState({});
+  const [downloadStatus, setDownloadStatus] = useState({});
 
   useEffect(() => {
     const timer = setTimeout(() => setShowSuccess(false), 5000);
@@ -23,6 +25,63 @@ const HomePage = () => {
     }
   }, [playlists]);
 
+  const handleDownload = async (categoryId, e) => {
+    e.stopPropagation();
+    
+    if (!deviceInfo?.device_id) {
+      alert('Cihaz bilgisi bulunamadı');
+      return;
+    }
+
+    // Find active playlist
+    const activePlaylist = playlists.find(p => p.is_active);
+    if (!activePlaylist) {
+      alert('Aktif playlist bulunamadı. Lütfen önce bir playlist ekleyin.');
+      navigate('/device-setup');
+      return;
+    }
+
+    setDownloading(prev => ({ ...prev, [categoryId]: true }));
+    setDownloadStatus(prev => ({ ...prev, [categoryId]: 'İçerik yükleniyor...' }));
+
+    try {
+      const backendUrl = process.env.REACT_APP_BACKEND_URL;
+      const response = await fetch(`${backendUrl}/api/playlist/parse/${activePlaylist.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setDownloadStatus(prev => ({ 
+          ...prev, 
+          [categoryId]: `✓ ${data.total_channels} kanal yüklendi!` 
+        }));
+        
+        // Clear status after 3 seconds
+        setTimeout(() => {
+          setDownloadStatus(prev => ({ ...prev, [categoryId]: '' }));
+        }, 3000);
+      } else {
+        setDownloadStatus(prev => ({ 
+          ...prev, 
+          [categoryId]: `✗ Hata: ${data.error || 'Yükleme başarısız'}` 
+        }));
+      }
+    } catch (err) {
+      console.error('Download error:', err);
+      setDownloadStatus(prev => ({ 
+        ...prev, 
+        [categoryId]: '✗ Bağlantı hatası' 
+      }));
+    } finally {
+      setDownloading(prev => ({ ...prev, [categoryId]: false }));
+    }
+  };
+
   const mainCategories = [
     {
       id: 'live-tv',
@@ -34,7 +93,7 @@ const HomePage = () => {
     },
     {
       id: 'movies',
-      title: 'SEÇ İZLE',
+      title: 'FİLMLER',
       icon: Film,
       path: '/movies',
       gradient: 'from-orange-500 to-red-600',
@@ -42,7 +101,7 @@ const HomePage = () => {
     },
     {
       id: 'series',
-      title: 'SERİLER',
+      title: 'DİZİLER',
       icon: Clapperboard,
       path: '/series',
       gradient: 'from-purple-500 to-pink-600',
@@ -151,6 +210,9 @@ const HomePage = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
           {mainCategories.map((category) => {
             const Icon = category.icon;
+            const isDownloading = downloading[category.id];
+            const status = downloadStatus[category.id];
+            
             return (
               <div
                 key={category.id}
@@ -160,12 +222,28 @@ const HomePage = () => {
                 <div className="flex flex-col items-center justify-center h-full">
                   <Icon className="w-20 h-20 mb-4 text-white" />
                   <h3 className="text-2xl font-bold text-white">{category.title}</h3>
+                  {status && (
+                    <p className="text-sm text-white mt-2 animate-fadeIn">{status}</p>
+                  )}
                 </div>
                 {category.hasDownload && (
-                  <div className="absolute bottom-4 right-4 flex items-center gap-2 text-white text-sm opacity-0 group-hover:opacity-100 transition">
-                    <Download className="w-4 h-4" />
-                    <span>İndir</span>
-                  </div>
+                  <button
+                    onClick={(e) => handleDownload(category.id, e)}
+                    disabled={isDownloading}
+                    className="absolute bottom-4 right-4 flex items-center gap-2 text-white text-sm bg-black/30 hover:bg-black/50 px-3 py-2 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isDownloading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Yükleniyor...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-4 h-4" />
+                        <span>İndir</span>
+                      </>
+                    )}
+                  </button>
                 )}
               </div>
             );
