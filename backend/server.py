@@ -1707,34 +1707,136 @@ async def get_channel_stream(channel_id: str, device_id: str):
 
 
 @api_router.get("/stream/proxy")
-async def proxy_stream(url: str):
+async def proxy_stream(url: str, request: Request):
     """
     Proxy HTTP streams through HTTPS backend to avoid Mixed Content errors.
     This allows HTTPS frontend to play HTTP IPTV streams.
+    Supports both HLS manifests (.m3u8) and video segments (.ts)
     """
     try:
-        logger.info(f"Proxying stream: {url[:50]}...")
+        logger.info(f"Proxying stream: {url[:80]}...")
         
-        async def stream_generator():
-            async with httpx.AsyncClient(timeout=None) as client:
-                async with client.stream("GET", url, headers={
-                    'User-Agent': 'Mozilla/5.0',
-                    'X-Forwarded-For': '85.95.236.89'
-                }) as response:
-                    async for chunk in response.aiter_bytes(chunk_size=8192):
-                        yield chunk
+        # Determine content type based on URL
+        is_manifest = '.m3u8' in url.lower()
+        content_type = "application/vnd.apple.mpegurl" if is_manifest else "video/mp2t"
         
-        return StreamingResponse(
-            stream_generator(),
-            media_type="video/mp2t",
-            headers={
-                "Accept-Ranges": "bytes",
-                "Cache-Control": "no-cache"
-            }
-        )
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': '*/*',
+            'X-Forwarded-For': '85.95.236.89',
+            'X-Real-IP': '85.95.236.89'
+        }
+        
+        if is_manifest:
+            # For manifests, we need to rewrite URLs inside the manifest
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(url, headers=headers, follow_redirects=True)
+                response.raise_for_status()
+                manifest_content = response.text
+                
+                # Rewrite URLs in manifest to go through our proxy
+                base_url = url.rsplit('/', 1)[0]
+                backend_url = str(request.base_url).rstrip('/')
+                
+                # Process each line of the manifest
+                lines = manifest_content.split('\n')
+                rewritten_lines = []
+                
+                for line in lines:
+                    line = line.strip()
+                    if line and not line.startswith('#'):
+                        # This is a URL line - rewrite it
+                        if line.startswith('http://') or line.startswith('https://'):
+                            # Absolute URL
+                            segment_url = line
+                        else:
+                            # Relative URL - make it absolute
+                            segment_url = f"{base_url}/{line}"
+                        
+                        # Only proxy HTTP URLs
+                        if segment_url.startswith('http://'):
+                            from urllib.parse import quote
+                            rewritten_lines.append(f"{backend_url}api/stream/proxy?url={quote(segment_url)}")
+                        else:
+                            rewritten_lines.append(segment_url)
+                    else:
+                        rewritten_lines.append(line)
+                
+                rewritten_manifest = '\n'.join(rewritten_lines)
+                
+                return Response(
+                    content=rewritten_manifest,
+                    media_type=content_type,
+                    headers={
+                        "Access-Control-Allow-Origin": "*",
+                        "Cache-Control": "no-cache, no-store"
+                    }
+                )
+        else:
+            # For .ts segments, stream the content
+            async def stream_generator():
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    async with client.stream("GET", url, headers=headers, follow_redirects=True) as response:
+                        async for chunk in response.aiter_bytes(chunk_size=65536):
+                            yield chunk
+            
+            return StreamingResponse(
+                stream_generator(),
+                media_type=content_type,
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Accept-Ranges": "bytes",
+                    "Cache-Control": "no-cache"
+                }
+            )
+    except httpx.HTTPError as e:
+        logger.error(f"HTTP error proxying stream: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Stream proxy HTTP error: {str(e)}")
     except Exception as e:
         logger.error(f"Stream proxy error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Stream proxy error: {str(e)}")
+
+
+@api_router.get("/image/proxy")
+async def proxy_image(url: str):
+    """
+    Proxy HTTP images through HTTPS backend to avoid Mixed Content errors.
+    Used for channel logos and other images from IPTV providers.
+    """
+    try:
+        if not url:
+            raise HTTPException(status_code=400, detail="URL required")
+            
+        logger.debug(f"Proxying image: {url[:80]}...")
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'image/*',
+        }
+        
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+            response = await client.get(url, headers=headers)
+            
+            if response.status_code != 200:
+                # Return a placeholder or transparent image
+                raise HTTPException(status_code=response.status_code, detail="Image not found")
+            
+            # Get content type from response
+            content_type = response.headers.get('content-type', 'image/png')
+            
+            return Response(
+                content=response.content,
+                media_type=content_type,
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Cache-Control": "public, max-age=86400"  # Cache for 24 hours
+                }
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Image proxy error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Image proxy error: {str(e)}")
 
 
 # Include the router in the main app
