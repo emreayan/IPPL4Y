@@ -2368,81 +2368,57 @@ def run_health_check_tests():
 
 def main():
     """Run all backend API tests"""
-    print("🚀 Starting IPPL4Y Platform Backend API Tests")
+    print("🚀 Starting IPPL4Y Backend API Tests")
+    print("="*60)
     print(f"Backend URL: {BACKEND_URL}")
+    print("="*60)
     
     all_results = []
     
-    # Run IPTV Stream & Proxy Tests (Primary focus based on review request)
-    iptv_results = run_iptv_tests()
-    all_results.extend(iptv_results)
-    
-    # Run Device & Playlist Management Tests (Already tested but included for completeness)
-    device_results = run_device_playlist_tests()
-    all_results.extend(device_results)
-    
-    # Run Logo Management Tests (Already tested but included for completeness)
-    logo_results = run_logo_management_tests()
-    all_results.extend(logo_results)
-    
-    # Run Health Check Tests (Already tested but included for completeness)
+    # Run Health Check Tests
     health_results = run_health_check_tests()
     all_results.extend(health_results)
     
-    # Summary
-    print("\n" + "="*80)
-    print("📊 COMPREHENSIVE TEST RESULTS SUMMARY")
-    print("="*80)
+    # Run Logo Management Tests
+    logo_results = run_logo_management_tests()
+    all_results.extend(logo_results)
+    
+    # Run Device & Playlist Tests
+    device_results = run_device_playlist_tests()
+    all_results.extend(device_results)
+    
+    # Run IPTV Tests
+    iptv_results = run_iptv_tests()
+    all_results.extend(iptv_results)
+    
+    # Run VOD Tests (NEW)
+    vod_results = run_vod_tests()
+    all_results.extend(vod_results)
+    
+    # Print Summary
+    print("\n" + "="*60)
+    print("📊 TEST RESULTS SUMMARY")
+    print("="*60)
     
     passed = 0
     failed = 0
     
-    print("\n📺 IPTV STREAM & PROXY API RESULTS:")
-    for test_name, result in iptv_results:
+    for test_name, result in all_results:
         status = "✅ PASS" if result else "❌ FAIL"
-        print(f"  {status} - {test_name}")
+        print(f"{status} - {test_name}")
         if result:
             passed += 1
         else:
             failed += 1
     
-    print("\n📱 DEVICE & PLAYLIST MANAGEMENT API RESULTS:")
-    for test_name, result in device_results:
-        status = "✅ PASS" if result else "❌ FAIL"
-        print(f"  {status} - {test_name}")
-        if result:
-            passed += 1
-        else:
-            failed += 1
+    print("\n" + "="*60)
+    print(f"📈 TOTAL: {len(all_results)} tests")
+    print(f"✅ PASSED: {passed}")
+    print(f"❌ FAILED: {failed}")
+    print(f"📊 SUCCESS RATE: {(passed/len(all_results)*100):.1f}%")
+    print("="*60)
     
-    print("\n🎨 LOGO MANAGEMENT API RESULTS:")
-    for test_name, result in logo_results:
-        status = "✅ PASS" if result else "❌ FAIL"
-        print(f"  {status} - {test_name}")
-        if result:
-            passed += 1
-        else:
-            failed += 1
-    
-    print("\n🏥 HEALTH CHECK API RESULTS:")
-    for test_name, result in health_results:
-        status = "✅ PASS" if result else "❌ FAIL"
-        print(f"  {status} - {test_name}")
-        if result:
-            passed += 1
-        else:
-            failed += 1
-    
-    print(f"\nTotal Tests: {len(all_results)}")
-    print(f"Passed: {passed}")
-    print(f"Failed: {failed}")
-    
-    if failed == 0:
-        print("\n🎉 All backend API tests passed successfully!")
-        return True
-    else:
-        print(f"\n⚠️  {failed} test(s) failed. Please check the issues above.")
-        return False
+    return failed == 0
 
 
 if __name__ == "__main__":
