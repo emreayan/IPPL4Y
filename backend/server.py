@@ -1048,28 +1048,50 @@ async def parse_and_cache_playlist(playlist_id: str):
         if not playlist:
             raise HTTPException(status_code=404, detail="Playlist bulunamadı")
         
+        logger.info(f"Playlist data: {playlist}")
+        
         # Check if already cached
         cached = await db.parsed_playlists.find_one({"playlist_id": playlist_id}, {"_id": 0})
         if cached:
             return {
                 "success": True,
                 "message": "Playlist zaten parse edilmiş",
-                "total_channels": len(cached.get("categories", [])),
+                "total_channels": cached.get("total_channels", 0),
                 "total_categories": len(cached.get("categories", [])),
                 "cached": True
             }
         
+        # Get playlist type - handle both 'type' and 'playlist_type' keys
+        playlist_type = playlist.get("type") or playlist.get("playlist_type", "m3u")
+        
         # Parse based on type
-        if playlist["type"] == "xtream":
+        if playlist_type == "xtream":
             # Xtream Codes parsing
             result = await parse_xtream_full_data(
-                playlist["url"],
-                playlist.get("username", ""),
-                playlist.get("password", "")
+                playlist.get("url") or playlist.get("playlist_url", ""),
+                playlist.get("username") or playlist.get("xtream_username", ""),
+                playlist.get("password") or playlist.get("xtream_password", "")
             )
+            
+            if result.get("success"):
+                # Cache the result
+                await db.parsed_playlists.update_one(
+                    {"playlist_id": playlist_id},
+                    {
+                        "$set": {
+                            "playlist_id": playlist_id,
+                            "type": "xtream",
+                            "categories": result.get("categories", []),
+                            "total_channels": result.get("total_channels", 0),
+                            "parsed_at": datetime.now(timezone.utc).isoformat()
+                        }
+                    },
+                    upsert=True
+                )
         else:
             # M3U parsing
-            result = await parse_m3u_playlist_internal(playlist["url"], playlist_id)
+            playlist_url = playlist.get("url") or playlist.get("playlist_url", "")
+            result = await parse_m3u_playlist_internal(playlist_url, playlist_id)
         
         if not result.get("success"):
             raise HTTPException(
