@@ -1690,7 +1690,11 @@ def main():
     
     all_results = []
     
-    # Run Device & Playlist Management Tests (Primary focus based on review request)
+    # Run IPTV Stream & Proxy Tests (Primary focus based on review request)
+    iptv_results = run_iptv_tests()
+    all_results.extend(iptv_results)
+    
+    # Run Device & Playlist Management Tests (Already tested but included for completeness)
     device_results = run_device_playlist_tests()
     all_results.extend(device_results)
     
@@ -1709,6 +1713,15 @@ def main():
     
     passed = 0
     failed = 0
+    
+    print("\n📺 IPTV STREAM & PROXY API RESULTS:")
+    for test_name, result in iptv_results:
+        status = "✅ PASS" if result else "❌ FAIL"
+        print(f"  {status} - {test_name}")
+        if result:
+            passed += 1
+        else:
+            failed += 1
     
     print("\n📱 DEVICE & PLAYLIST MANAGEMENT API RESULTS:")
     for test_name, result in device_results:
