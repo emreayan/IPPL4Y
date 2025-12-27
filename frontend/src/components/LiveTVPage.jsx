@@ -97,20 +97,14 @@ const LiveTVPage = () => {
     }
   };
 
-  if (!currentPlaylist) {
+  if (!deviceInfo) {
     return (
       <div className="min-h-screen bg-[#0F171E] flex items-center justify-center">
         <Alert className="max-w-md bg-orange-500/20 border-orange-500/50">
           <AlertCircle className="h-5 w-5 text-orange-500" />
           <AlertDescription className="text-white">
-            Aktif playlist bulunamadı. Lütfen önce bir playlist ekleyin.
+            Cihaz bilgisi yükleniyor...
           </AlertDescription>
-          <Button
-            onClick={() => navigate('/device-setup')}
-            className="mt-4 bg-orange-500 hover:bg-orange-600"
-          >
-            Playlist Ekle
-          </Button>
         </Alert>
       </div>
     );
