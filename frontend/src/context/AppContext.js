@@ -236,6 +236,16 @@ export const AppProvider = ({ children }) => {
     const storedVisibility = localStorage.getItem('ippl4yChannelVisibility');
     const storedDeviceInfo = localStorage.getItem('ippl4yDeviceInfo');
     
+    // Restore device info from localStorage first
+    if (storedDeviceInfo) {
+      try {
+        const deviceData = JSON.parse(storedDeviceInfo);
+        setDeviceInfo(deviceData);
+      } catch (e) {
+        console.error('Failed to parse stored device info:', e);
+      }
+    }
+    
     if (storedUser) {
       const userData = JSON.parse(storedUser);
       setUser(userData);
