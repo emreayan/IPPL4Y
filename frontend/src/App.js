@@ -5,6 +5,7 @@ import { AppProvider, useApp } from "./context/AppContext";
 import Login from "./components/Login";
 import DeviceSetup from "./components/DeviceSetup";
 import HomePage from "./components/HomePage";
+import LiveTVPage from "./components/LiveTVPage";
 import Player from "./components/Player";
 import BouquetSettings from "./components/BouquetSettings";
 import AdminPanel from "./components/AdminPanel";
@@ -30,6 +31,30 @@ function AppRoutes() {
         />
         <Route
           path="/home"
+          element={
+            <ProtectedRoute>
+              <HomePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/live-tv"
+          element={
+            <ProtectedRoute>
+              <LiveTVPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/movies"
+          element={
+            <ProtectedRoute>
+              <HomePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/series"
           element={
             <ProtectedRoute>
               <HomePage />
