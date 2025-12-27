@@ -6,6 +6,8 @@ import Login from "./components/Login";
 import DeviceSetup from "./components/DeviceSetup";
 import HomePage from "./components/HomePage";
 import LiveTVPage from "./components/LiveTVPage";
+import MoviesPage from "./components/MoviesPage";
+import MovieDetailPage from "./components/MovieDetailPage";
 import Player from "./components/Player";
 import BouquetSettings from "./components/BouquetSettings";
 import AdminPanel from "./components/AdminPanel";
@@ -49,7 +51,15 @@ function AppRoutes() {
           path="/movies"
           element={
             <ProtectedRoute>
-              <HomePage />
+              <MoviesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/movie/:movieId"
+          element={
+            <ProtectedRoute>
+              <MovieDetailPage />
             </ProtectedRoute>
           }
         />
