@@ -1079,6 +1079,12 @@ async def parse_and_cache_playlist(playlist_id: str):
             xtream_username = playlist.get("username") or playlist.get("xtream_username")
             xtream_password = playlist.get("password") or playlist.get("xtream_password")
             
+            # Trim whitespace from credentials
+            if xtream_username:
+                xtream_username = xtream_username.strip()
+            if xtream_password:
+                xtream_password = xtream_password.strip()
+            
             # If not in playlist, try to extract from URL
             if not xtream_username or not xtream_password:
                 import re
@@ -1671,10 +1677,26 @@ async def get_channel_stream(channel_id: str, device_id: str):
         if not channel:
             raise HTTPException(status_code=404, detail="Kanal bulunamadı")
         
+        # Get original stream URL
+        original_stream_url = channel.get('stream_url')
+        
+        # If stream is HTTP and we're on HTTPS, use proxy
+        if original_stream_url and original_stream_url.startswith('http://'):
+            # Create proxied URL
+            from urllib.parse import quote
+            proxied_url = f"{os.environ.get('REACT_APP_BACKEND_URL', '')}/api/stream/proxy?url={quote(original_stream_url)}"
+            
+            return {
+                "success": True,
+                "channel": channel,
+                "stream_url": proxied_url,
+                "original_url": original_stream_url
+            }
+        
         return {
             "success": True,
             "channel": channel,
-            "stream_url": channel.get('stream_url')
+            "stream_url": original_stream_url
         }
         
     except HTTPException:
@@ -1682,6 +1704,37 @@ async def get_channel_stream(channel_id: str, device_id: str):
     except Exception as e:
         logger.error(f"Error getting stream: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/stream/proxy")
+async def proxy_stream(url: str):
+    """
+    Proxy HTTP streams through HTTPS backend to avoid Mixed Content errors.
+    This allows HTTPS frontend to play HTTP IPTV streams.
+    """
+    try:
+        logger.info(f"Proxying stream: {url[:50]}...")
+        
+        async def stream_generator():
+            async with httpx.AsyncClient(timeout=None) as client:
+                async with client.stream("GET", url, headers={
+                    'User-Agent': 'Mozilla/5.0',
+                    'X-Forwarded-For': '85.95.236.89'
+                }) as response:
+                    async for chunk in response.aiter_bytes(chunk_size=8192):
+                        yield chunk
+        
+        return StreamingResponse(
+            stream_generator(),
+            media_type="video/mp2t",
+            headers={
+                "Accept-Ranges": "bytes",
+                "Cache-Control": "no-cache"
+            }
+        )
+    except Exception as e:
+        logger.error(f"Stream proxy error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Stream proxy error: {str(e)}")
 
 
 # Include the router in the main app

@@ -17,6 +17,8 @@ const LiveTVPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [clickTimeout, setClickTimeout] = useState(null);
 
   useEffect(() => {
     if (deviceInfo?.device_id) {
@@ -76,8 +78,28 @@ const LiveTVPage = () => {
     loadChannels();
   };
 
-  const handleChannelSelect = async (channel) => {
+  const handleChannelClick = (channel) => {
+    // Single click - play in small player
+    if (clickTimeout) {
+      // This is a double click
+      clearTimeout(clickTimeout);
+      setClickTimeout(null);
+      handleChannelDoubleClick(channel);
+    } else {
+      // Wait to see if it's a double click
+      const timeout = setTimeout(() => {
+        handleChannelSingleClick(channel);
+        setClickTimeout(null);
+      }, 250);
+      setClickTimeout(timeout);
+    }
+  };
+
+  const handleChannelSingleClick = async (channel) => {
+    // Single click - play in side player (small)
     setSelectedChannel(channel);
+    setIsFullscreen(false);
+    
     // Fetch stream URL
     try {
       const backendUrl = process.env.REACT_APP_BACKEND_URL;
@@ -95,6 +117,33 @@ const LiveTVPage = () => {
     } catch (err) {
       console.error('Error fetching stream:', err);
     }
+  };
+
+  const handleChannelDoubleClick = async (channel) => {
+    // Double click - open fullscreen player
+    setIsFullscreen(true);
+    
+    // Fetch stream URL
+    try {
+      const backendUrl = process.env.REACT_APP_BACKEND_URL;
+      const response = await fetch(
+        `${backendUrl}/api/channels/stream/${channel.id}?device_id=${deviceInfo.device_id}`
+      );
+      const data = await response.json();
+      
+      if (data.success) {
+        setSelectedChannel({
+          ...channel,
+          stream_url: data.stream_url
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching stream:', err);
+    }
+  };
+
+  const closeFullscreenPlayer = () => {
+    setIsFullscreen(false);
   };
 
   if (!deviceInfo) {
@@ -195,7 +244,7 @@ const LiveTVPage = () => {
                 {channels.map((channel) => (
                   <div
                     key={channel.id}
-                    onClick={() => handleChannelSelect(channel)}
+                    onClick={() => handleChannelClick(channel)}
                     className={`flex items-center gap-4 p-4 rounded-lg cursor-pointer transition ${
                       selectedChannel?.id === channel.id
                         ? 'bg-blue-600'
@@ -255,12 +304,24 @@ const LiveTVPage = () => {
           ) : (
             <div className="flex items-center justify-center h-full">
               <div className="text-center p-6">
-                <p className="text-gray-400">Oynamak için bir kanal seçin</p>
+                <p className="text-gray-400">Tek tıklama: Burada oynat</p>
+                <p className="text-gray-400 text-sm mt-2">Çift tıklama: Tam ekran</p>
               </div>
             </div>
           )}
         </div>
       </div>
+
+      {/* Fullscreen Player Modal */}
+      {isFullscreen && selectedChannel?.stream_url && (
+        <div className="fixed inset-0 z-50 bg-black">
+          <VideoPlayer
+            streamUrl={selectedChannel.stream_url}
+            channelName={selectedChannel.name}
+            onClose={closeFullscreenPlayer}
+          />
+        </div>
+      )}
     </div>
   );
 };
