@@ -381,13 +381,14 @@ metadata:
 
 test_plan:
   current_focus:
-    - "IPTV Stream Proxy API"
-    - "IPTV Image Proxy API"
-    - "IPTV Device Authentication"
-    - "IPTV Playlist Management"
-    - "IPTV Playlist Parsing"
-    - "IPTV Channel Categories API"
-    - "IPTV Channels by Category API"
+    - "VOD Movie Categories API"
+    - "VOD Movies List API"
+    - "VOD Movie Details API"
+    - "VOD Series Categories API"
+    - "VOD Series List API"
+    - "VOD Series Details API"
+    - "User Watchlist API"
+    - "Continue Watching API"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
