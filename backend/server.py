@@ -1033,6 +1033,105 @@ async def get_cached_playlist(playlist_id: str):
     return cached
 
 
+@api_router.post("/playlist/parse/{playlist_id}")
+async def parse_and_cache_playlist(playlist_id: str):
+    """
+    Parse a playlist and cache the results.
+    This endpoint should be called after adding a new playlist.
+    """
+    try:
+        logger.info(f"Parse request for playlist: {playlist_id}")
+        
+        # Get playlist
+        playlist = await db.playlists.find_one({"id": playlist_id}, {"_id": 0})
+        
+        if not playlist:
+            raise HTTPException(status_code=404, detail="Playlist bulunamadı")
+        
+        # Check if already cached
+        cached = await db.parsed_playlists.find_one({"playlist_id": playlist_id}, {"_id": 0})
+        if cached:
+            return {
+                "success": True,
+                "message": "Playlist zaten parse edilmiş",
+                "total_channels": len(cached.get("categories", [])),
+                "total_categories": len(cached.get("categories", [])),
+                "cached": True
+            }
+        
+        # Parse based on type
+        if playlist["type"] == "xtream":
+            # Xtream Codes parsing
+            result = await parse_xtream_full_data(
+                playlist["url"],
+                playlist.get("username", ""),
+                playlist.get("password", "")
+            )
+        else:
+            # M3U parsing
+            result = await parse_m3u_playlist_internal(playlist["url"], playlist_id)
+        
+        if not result.get("success"):
+            raise HTTPException(
+                status_code=400,
+                detail=result.get("error", "Parse başarısız")
+            )
+        
+        return {
+            "success": True,
+            "message": "Playlist başarıyla parse edildi",
+            "total_channels": result.get("total_channels", 0),
+            "total_categories": len(result.get("categories", [])),
+            "cached": False
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Parse error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def parse_m3u_playlist_internal(m3u_url: str, playlist_id: str):
+    """Internal M3U parsing with caching"""
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0',
+            'X-Forwarded-For': '85.95.236.89'
+        }
+        
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.get(m3u_url, headers=headers)
+            response.raise_for_status()
+            content = response.text
+        
+        channels = parse_m3u_content(content)
+        categories = group_channels_by_category(channels)
+        
+        # Cache
+        await db.parsed_playlists.update_one(
+            {"playlist_id": playlist_id},
+            {
+                "$set": {
+                    "playlist_id": playlist_id,
+                    "categories": categories,
+                    "total_channels": len(channels),
+                    "parsed_at": datetime.now(timezone.utc).isoformat()
+                }
+            },
+            upsert=True
+        )
+        
+        return {
+            "success": True,
+            "total_channels": len(channels),
+            "categories": categories
+        }
+    except Exception as e:
+        logger.error(f"M3U parse error: {str(e)}")
+        return {"success": False, "error": str(e)}
+
+
 @api_router.post("/playlist/parse-url")
 async def parse_playlist_url(url: str, playlist_type: str = "m3u", xtream_username: Optional[str] = None, xtream_password: Optional[str] = None, limit: Optional[int] = 100):
     """Parse a playlist URL directly without saving to database"""
