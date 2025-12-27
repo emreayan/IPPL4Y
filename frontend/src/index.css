@@ -2,6 +2,48 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  :root {
+    --background: 220 27% 9%;
+    --foreground: 0 0% 100%;
+    --card: 216 24% 14%;
+    --card-foreground: 0 0% 100%;
+    --popover: 216 24% 14%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 195 100% 44%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 36 100% 50%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 216 24% 14%;
+    --muted-foreground: 0 0% 70%;
+    --accent: 195 100% 44%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 216 24% 20%;
+    --input: 216 24% 20%;
+    --ring: 195 100% 44%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer utilities {
+  .animate-fadeIn {
+    animation: fadeIn 0.5s ease-in;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
 body {
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
