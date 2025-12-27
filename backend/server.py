@@ -1814,7 +1814,7 @@ async def proxy_image(url: str):
             'Accept': 'image/*',
         }
         
-        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True, verify=False) as client:
             response = await client.get(url, headers=headers)
             
             if response.status_code != 200:
