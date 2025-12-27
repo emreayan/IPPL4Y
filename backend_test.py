@@ -1639,6 +1639,689 @@ def run_iptv_tests():
     return iptv_results
 
 
+# ==================== VOD (VIDEO ON DEMAND) TESTS ====================
+
+def test_vod_movie_categories():
+    """Test GET /api/vod/movies/categories - Get movie categories"""
+    print("\n=== Testing GET /api/vod/movies/categories ===")
+    
+    try:
+        print(f"Getting movie categories for device: {TEST_DEVICE_ID}")
+        
+        response = requests.get(
+            f"{BACKEND_URL}/vod/movies/categories",
+            params={"device_id": TEST_DEVICE_ID},
+            timeout=30
+        )
+        
+        print(f"Response Status Code: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Response Data: {json.dumps(data, indent=2)}")
+            
+            # Validate response structure
+            required_fields = ['success', 'categories']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                print(f"❌ FAIL: Missing required fields: {missing_fields}")
+                return False
+            
+            if data['success'] is not True:
+                print(f"❌ FAIL: Expected success to be true, got: {data['success']}")
+                return False
+            
+            categories = data.get('categories', [])
+            if not isinstance(categories, list):
+                print(f"❌ FAIL: Expected categories to be a list, got: {type(categories)}")
+                return False
+            
+            print(f"✅ Movie categories retrieved - {len(categories)} categories found")
+            return True
+            
+        else:
+            print(f"❌ FAIL: HTTP {response.status_code}")
+            print(f"Response: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ FAIL: Unexpected error - {str(e)}")
+        return False
+
+
+def test_vod_movies_list():
+    """Test GET /api/vod/movies - Get movies list"""
+    print("\n=== Testing GET /api/vod/movies ===")
+    
+    try:
+        print(f"Getting movies list for device: {TEST_DEVICE_ID}")
+        
+        response = requests.get(
+            f"{BACKEND_URL}/vod/movies",
+            params={
+                "device_id": TEST_DEVICE_ID,
+                "page": 1,
+                "limit": 10
+            },
+            timeout=30
+        )
+        
+        print(f"Response Status Code: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Response Data: {json.dumps(data, indent=2)}")
+            
+            # Validate response structure
+            required_fields = ['success', 'movies', 'total', 'pages']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                print(f"❌ FAIL: Missing required fields: {missing_fields}")
+                return False
+            
+            if data['success'] is not True:
+                print(f"❌ FAIL: Expected success to be true, got: {data['success']}")
+                return False
+            
+            movies = data.get('movies', [])
+            if not isinstance(movies, list):
+                print(f"❌ FAIL: Expected movies to be a list, got: {type(movies)}")
+                return False
+            
+            total = data.get('total', 0)
+            pages = data.get('pages', 0)
+            
+            print(f"✅ Movies list retrieved - {len(movies)} movies, Total: {total}, Pages: {pages}")
+            
+            # Store first movie ID for detail test
+            if movies:
+                global test_movie_id
+                test_movie_id = movies[0].get('id')
+                print(f"Stored movie ID for detail test: {test_movie_id}")
+            
+            return True
+            
+        else:
+            print(f"❌ FAIL: HTTP {response.status_code}")
+            print(f"Response: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ FAIL: Unexpected error - {str(e)}")
+        return False
+
+
+def test_vod_movie_detail():
+    """Test GET /api/vod/movie/{movie_id} - Get movie details with OMDb enrichment"""
+    print("\n=== Testing GET /api/vod/movie/{movie_id} ===")
+    
+    try:
+        # Use movie ID from previous test or default
+        movie_id = test_movie_id if 'test_movie_id' in globals() and test_movie_id else '1'
+            
+        print(f"Getting movie detail for ID: {movie_id}, Device: {TEST_DEVICE_ID}")
+        
+        response = requests.get(
+            f"{BACKEND_URL}/vod/movie/{movie_id}",
+            params={"device_id": TEST_DEVICE_ID},
+            timeout=30
+        )
+        
+        print(f"Response Status Code: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Response Data: {json.dumps(data, indent=2)}")
+            
+            # Validate response structure
+            required_fields = ['success', 'movie']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                print(f"❌ FAIL: Missing required fields: {missing_fields}")
+                return False
+            
+            if data['success'] is not True:
+                print(f"❌ FAIL: Expected success to be true, got: {data['success']}")
+                return False
+            
+            movie = data.get('movie', {})
+            if not isinstance(movie, dict):
+                print(f"❌ FAIL: Expected movie to be a dict, got: {type(movie)}")
+                return False
+            
+            # Validate movie structure (OMDb enriched)
+            movie_required_fields = ['id', 'name', 'stream_url']
+            missing_movie_fields = [field for field in movie_required_fields if field not in movie]
+            
+            if missing_movie_fields:
+                print(f"❌ FAIL: Missing movie fields: {missing_movie_fields}")
+                return False
+            
+            # Check for OMDb enrichment fields
+            omdb_fields = ['plot', 'director', 'cast', 'imdb_rating']
+            omdb_present = [field for field in omdb_fields if movie.get(field)]
+            
+            print(f"✅ Movie detail retrieved - Name: {movie.get('name')}")
+            print(f"✅ OMDb enrichment fields present: {omdb_present}")
+            return True
+            
+        else:
+            print(f"❌ FAIL: HTTP {response.status_code}")
+            print(f"Response: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ FAIL: Unexpected error - {str(e)}")
+        return False
+
+
+def test_vod_series_categories():
+    """Test GET /api/vod/series/categories - Get series categories"""
+    print("\n=== Testing GET /api/vod/series/categories ===")
+    
+    try:
+        print(f"Getting series categories for device: {TEST_DEVICE_ID}")
+        
+        response = requests.get(
+            f"{BACKEND_URL}/vod/series/categories",
+            params={"device_id": TEST_DEVICE_ID},
+            timeout=30
+        )
+        
+        print(f"Response Status Code: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Response Data: {json.dumps(data, indent=2)}")
+            
+            # Validate response structure
+            required_fields = ['success', 'categories']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                print(f"❌ FAIL: Missing required fields: {missing_fields}")
+                return False
+            
+            if data['success'] is not True:
+                print(f"❌ FAIL: Expected success to be true, got: {data['success']}")
+                return False
+            
+            categories = data.get('categories', [])
+            if not isinstance(categories, list):
+                print(f"❌ FAIL: Expected categories to be a list, got: {type(categories)}")
+                return False
+            
+            print(f"✅ Series categories retrieved - {len(categories)} categories found")
+            return True
+            
+        else:
+            print(f"❌ FAIL: HTTP {response.status_code}")
+            print(f"Response: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ FAIL: Unexpected error - {str(e)}")
+        return False
+
+
+def test_vod_series_list():
+    """Test GET /api/vod/series - Get series list"""
+    print("\n=== Testing GET /api/vod/series ===")
+    
+    try:
+        print(f"Getting series list for device: {TEST_DEVICE_ID}")
+        
+        response = requests.get(
+            f"{BACKEND_URL}/vod/series",
+            params={
+                "device_id": TEST_DEVICE_ID,
+                "page": 1,
+                "limit": 10
+            },
+            timeout=30
+        )
+        
+        print(f"Response Status Code: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Response Data: {json.dumps(data, indent=2)}")
+            
+            # Validate response structure
+            required_fields = ['success', 'series', 'total', 'pages']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                print(f"❌ FAIL: Missing required fields: {missing_fields}")
+                return False
+            
+            if data['success'] is not True:
+                print(f"❌ FAIL: Expected success to be true, got: {data['success']}")
+                return False
+            
+            series = data.get('series', [])
+            if not isinstance(series, list):
+                print(f"❌ FAIL: Expected series to be a list, got: {type(series)}")
+                return False
+            
+            total = data.get('total', 0)
+            pages = data.get('pages', 0)
+            
+            print(f"✅ Series list retrieved - {len(series)} series, Total: {total}, Pages: {pages}")
+            
+            # Store first series ID for detail test
+            if series:
+                global test_series_id
+                test_series_id = series[0].get('id')
+                print(f"Stored series ID for detail test: {test_series_id}")
+            
+            return True
+            
+        else:
+            print(f"❌ FAIL: HTTP {response.status_code}")
+            print(f"Response: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ FAIL: Unexpected error - {str(e)}")
+        return False
+
+
+def test_vod_series_detail():
+    """Test GET /api/vod/series/{series_id} - Get series details with seasons and episodes"""
+    print("\n=== Testing GET /api/vod/series/{series_id} ===")
+    
+    try:
+        # Use series ID from previous test or default
+        series_id = test_series_id if 'test_series_id' in globals() and test_series_id else '1'
+        
+        print(f"Getting series detail for ID: {series_id}, Device: {TEST_DEVICE_ID}")
+        
+        response = requests.get(
+            f"{BACKEND_URL}/vod/series/{series_id}",
+            params={"device_id": TEST_DEVICE_ID},
+            timeout=30
+        )
+        
+        print(f"Response Status Code: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Response Data: {json.dumps(data, indent=2)}")
+            
+            # Validate response structure
+            required_fields = ['success', 'series']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                print(f"❌ FAIL: Missing required fields: {missing_fields}")
+                return False
+            
+            if data['success'] is not True:
+                print(f"❌ FAIL: Expected success to be true, got: {data['success']}")
+                return False
+            
+            series = data.get('series', {})
+            if not isinstance(series, dict):
+                print(f"❌ FAIL: Expected series to be a dict, got: {type(series)}")
+                return False
+            
+            # Validate series structure with seasons and episodes
+            series_required_fields = ['id', 'name', 'seasons', 'total_seasons', 'total_episodes']
+            missing_series_fields = [field for field in series_required_fields if field not in series]
+            
+            if missing_series_fields:
+                print(f"❌ FAIL: Missing series fields: {missing_series_fields}")
+                return False
+            
+            seasons = series.get('seasons', [])
+            if not isinstance(seasons, list):
+                print(f"❌ FAIL: Expected seasons to be a list, got: {type(seasons)}")
+                return False
+            
+            # Validate season structure if seasons exist
+            if seasons:
+                first_season = seasons[0]
+                season_required_fields = ['season_number', 'episodes']
+                missing_season_fields = [field for field in season_required_fields if field not in first_season]
+                
+                if missing_season_fields:
+                    print(f"❌ FAIL: Missing season fields: {missing_season_fields}")
+                    return False
+                
+                episodes = first_season.get('episodes', [])
+                if episodes and isinstance(episodes, list):
+                    first_episode = episodes[0]
+                    episode_required_fields = ['id', 'title', 'episode_num']
+                    missing_episode_fields = [field for field in episode_required_fields if field not in first_episode]
+                    
+                    if missing_episode_fields:
+                        print(f"❌ FAIL: Missing episode fields: {missing_episode_fields}")
+                        return False
+            
+            total_seasons = series.get('total_seasons', 0)
+            total_episodes = series.get('total_episodes', 0)
+            
+            print(f"✅ Series detail retrieved - Name: {series.get('name')}")
+            print(f"✅ Seasons: {total_seasons}, Episodes: {total_episodes}")
+            return True
+            
+        else:
+            print(f"❌ FAIL: HTTP {response.status_code}")
+            print(f"Response: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ FAIL: Unexpected error - {str(e)}")
+        return False
+
+
+def test_watchlist_get():
+    """Test GET /api/user/watchlist - Get user's watchlist"""
+    print("\n=== Testing GET /api/user/watchlist ===")
+    
+    try:
+        print(f"Getting watchlist for device: {TEST_DEVICE_ID}")
+        
+        response = requests.get(
+            f"{BACKEND_URL}/user/watchlist",
+            params={"device_id": TEST_DEVICE_ID},
+            timeout=30
+        )
+        
+        print(f"Response Status Code: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Response Data: {json.dumps(data, indent=2)}")
+            
+            # Validate response structure
+            required_fields = ['success', 'movies', 'series']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                print(f"❌ FAIL: Missing required fields: {missing_fields}")
+                return False
+            
+            if data['success'] is not True:
+                print(f"❌ FAIL: Expected success to be true, got: {data['success']}")
+                return False
+            
+            movies = data.get('movies', [])
+            series = data.get('series', [])
+            
+            if not isinstance(movies, list):
+                print(f"❌ FAIL: Expected movies to be a list, got: {type(movies)}")
+                return False
+            
+            if not isinstance(series, list):
+                print(f"❌ FAIL: Expected series to be a list, got: {type(series)}")
+                return False
+            
+            print(f"✅ Watchlist retrieved - Movies: {len(movies)}, Series: {len(series)}")
+            return True
+            
+        else:
+            print(f"❌ FAIL: HTTP {response.status_code}")
+            print(f"Response: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ FAIL: Unexpected error - {str(e)}")
+        return False
+
+
+def test_watchlist_add_movie():
+    """Test POST /api/user/watchlist/add - Add movie to watchlist"""
+    print("\n=== Testing POST /api/user/watchlist/add (Movie) ===")
+    
+    try:
+        # Use movie ID from previous test or default
+        movie_id = test_movie_id if 'test_movie_id' in globals() and test_movie_id else 'test_movie_1'
+        
+        payload = {
+            "item_id": movie_id,
+            "item_type": "movie",
+            "name": "Test Movie",
+            "poster": "http://example.com/poster.jpg"
+        }
+        
+        print(f"Adding movie to watchlist for device: {TEST_DEVICE_ID}")
+        print(f"Payload: {json.dumps(payload, indent=2)}")
+        
+        response = requests.post(
+            f"{BACKEND_URL}/user/watchlist/add",
+            params={"device_id": TEST_DEVICE_ID},
+            json=payload,
+            timeout=30
+        )
+        
+        print(f"Response Status Code: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Response Data: {json.dumps(data, indent=2)}")
+            
+            # Validate response structure
+            required_fields = ['success', 'message']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                print(f"❌ FAIL: Missing required fields: {missing_fields}")
+                return False
+            
+            if data['success'] is not True:
+                print(f"❌ FAIL: Expected success to be true, got: {data['success']}")
+                return False
+            
+            print("✅ Movie added to watchlist successfully")
+            return True
+            
+        else:
+            print(f"❌ FAIL: HTTP {response.status_code}")
+            print(f"Response: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ FAIL: Unexpected error - {str(e)}")
+        return False
+
+
+def test_watchlist_remove_movie():
+    """Test DELETE /api/user/watchlist/remove - Remove movie from watchlist"""
+    print("\n=== Testing DELETE /api/user/watchlist/remove (Movie) ===")
+    
+    try:
+        # Use movie ID from previous test or default
+        movie_id = test_movie_id if 'test_movie_id' in globals() and test_movie_id else 'test_movie_1'
+        
+        print(f"Removing movie from watchlist for device: {TEST_DEVICE_ID}")
+        print(f"Movie ID: {movie_id}")
+        
+        response = requests.delete(
+            f"{BACKEND_URL}/user/watchlist/remove",
+            params={
+                "device_id": TEST_DEVICE_ID,
+                "item_id": movie_id,
+                "item_type": "movie"
+            },
+            timeout=30
+        )
+        
+        print(f"Response Status Code: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Response Data: {json.dumps(data, indent=2)}")
+            
+            # Validate response structure
+            required_fields = ['success', 'message']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                print(f"❌ FAIL: Missing required fields: {missing_fields}")
+                return False
+            
+            if data['success'] is not True:
+                print(f"❌ FAIL: Expected success to be true, got: {data['success']}")
+                return False
+            
+            print("✅ Movie removed from watchlist successfully")
+            return True
+            
+        else:
+            print(f"❌ FAIL: HTTP {response.status_code}")
+            print(f"Response: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ FAIL: Unexpected error - {str(e)}")
+        return False
+
+
+def test_continue_watching_get():
+    """Test GET /api/user/continue-watching - Get continue watching list"""
+    print("\n=== Testing GET /api/user/continue-watching ===")
+    
+    try:
+        print(f"Getting continue watching for device: {TEST_DEVICE_ID}")
+        
+        response = requests.get(
+            f"{BACKEND_URL}/user/continue-watching",
+            params={"device_id": TEST_DEVICE_ID},
+            timeout=30
+        )
+        
+        print(f"Response Status Code: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Response Data: {json.dumps(data, indent=2)}")
+            
+            # Validate response structure
+            required_fields = ['success', 'items']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                print(f"❌ FAIL: Missing required fields: {missing_fields}")
+                return False
+            
+            if data['success'] is not True:
+                print(f"❌ FAIL: Expected success to be true, got: {data['success']}")
+                return False
+            
+            items = data.get('items', [])
+            if not isinstance(items, list):
+                print(f"❌ FAIL: Expected items to be a list, got: {type(items)}")
+                return False
+            
+            print(f"✅ Continue watching retrieved - {len(items)} items")
+            return True
+            
+        else:
+            print(f"❌ FAIL: HTTP {response.status_code}")
+            print(f"Response: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ FAIL: Unexpected error - {str(e)}")
+        return False
+
+
+def test_continue_watching_update():
+    """Test POST /api/user/continue-watching/update - Update progress"""
+    print("\n=== Testing POST /api/user/continue-watching/update ===")
+    
+    try:
+        # Use movie ID from previous test or default
+        movie_id = test_movie_id if 'test_movie_id' in globals() and test_movie_id else 'test_movie_1'
+        
+        payload = {
+            "item_id": movie_id,
+            "item_type": "movie",
+            "progress": 45.5,
+            "duration": 120.0,
+            "name": "Test Movie"
+        }
+        
+        print(f"Updating continue watching progress for device: {TEST_DEVICE_ID}")
+        print(f"Payload: {json.dumps(payload, indent=2)}")
+        
+        response = requests.post(
+            f"{BACKEND_URL}/user/continue-watching/update",
+            params={"device_id": TEST_DEVICE_ID},
+            json=payload,
+            timeout=30
+        )
+        
+        print(f"Response Status Code: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Response Data: {json.dumps(data, indent=2)}")
+            
+            # Validate response structure
+            required_fields = ['success', 'message']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                print(f"❌ FAIL: Missing required fields: {missing_fields}")
+                return False
+            
+            if data['success'] is not True:
+                print(f"❌ FAIL: Expected success to be true, got: {data['success']}")
+                return False
+            
+            print("✅ Continue watching progress updated successfully")
+            return True
+            
+        else:
+            print(f"❌ FAIL: HTTP {response.status_code}")
+            print(f"Response: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ FAIL: Unexpected error - {str(e)}")
+        return False
+
+
+def run_vod_tests():
+    """Run all VOD (Video on Demand) tests from review request"""
+    print("\n🎬 Starting VOD (Video on Demand) API Tests")
+    print("="*60)
+    
+    vod_results = []
+    
+    # Initialize global variables for movie/series IDs
+    global test_movie_id, test_series_id
+    test_movie_id = None
+    test_series_id = None
+    
+    # VOD Movie Tests
+    vod_results.append(("GET /api/vod/movies/categories", test_vod_movie_categories()))
+    vod_results.append(("GET /api/vod/movies", test_vod_movies_list()))
+    vod_results.append(("GET /api/vod/movie/{movie_id}", test_vod_movie_detail()))
+    
+    # VOD Series Tests
+    vod_results.append(("GET /api/vod/series/categories", test_vod_series_categories()))
+    vod_results.append(("GET /api/vod/series", test_vod_series_list()))
+    vod_results.append(("GET /api/vod/series/{series_id}", test_vod_series_detail()))
+    
+    # Watchlist Tests
+    vod_results.append(("GET /api/user/watchlist", test_watchlist_get()))
+    vod_results.append(("POST /api/user/watchlist/add (Movie)", test_watchlist_add_movie()))
+    vod_results.append(("DELETE /api/user/watchlist/remove (Movie)", test_watchlist_remove_movie()))
+    
+    # Continue Watching Tests
+    vod_results.append(("GET /api/user/continue-watching", test_continue_watching_get()))
+    vod_results.append(("POST /api/user/continue-watching/update", test_continue_watching_update()))
+    
+    return vod_results
+
+
 def run_device_playlist_tests():
     """Run all device and playlist management tests"""
     print("\n📱 Starting Device & Playlist Management API Tests")
