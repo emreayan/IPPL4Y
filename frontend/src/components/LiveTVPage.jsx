@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { Search, Loader2, AlertCircle } from 'lucide-react';
+import { Search, Loader2, AlertCircle, Play } from 'lucide-react';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Alert, AlertDescription } from './ui/alert';
@@ -9,16 +9,15 @@ import VideoPlayer from './VideoPlayer';
 
 const LiveTVPage = () => {
   const navigate = useNavigate();
-  const { deviceInfo, currentPlaylist } = useApp();
+  const { deviceInfo, currentPlaylist, toggleFavorite, isFavorite } = useApp();
   const [categories, setCategories] = useState([]);
   const [channels, setChannels] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedChannel, setSelectedChannel] = useState(null);
+  const [currentChannelIndex, setCurrentChannelIndex] = useState(-1);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [clickTimeout, setClickTimeout] = useState(null);
   
   const backendUrl = process.env.REACT_APP_BACKEND_URL;
   
@@ -92,29 +91,9 @@ const LiveTVPage = () => {
     loadChannels();
   };
 
-  const handleChannelClick = (channel) => {
-    // Single click - play in small player
-    if (clickTimeout) {
-      // This is a double click
-      clearTimeout(clickTimeout);
-      setClickTimeout(null);
-      handleChannelDoubleClick(channel);
-    } else {
-      // Wait to see if it's a double click
-      const timeout = setTimeout(() => {
-        handleChannelSingleClick(channel);
-        setClickTimeout(null);
-      }, 250);
-      setClickTimeout(timeout);
-    }
-  };
-
-  const handleChannelSingleClick = async (channel) => {
-    // Single click - play in side player (small)
-    setSelectedChannel(channel);
-    setIsFullscreen(false);
+  const handleChannelChange = async (channel, index) => {
+    setCurrentChannelIndex(index);
     
-    // Fetch stream URL
     try {
       const backendUrl = process.env.REACT_APP_BACKEND_URL;
       const response = await fetch(
@@ -122,22 +101,30 @@ const LiveTVPage = () => {
       );
       const data = await response.json();
       
-      if (data.success) {
+      if (data.success && data.stream_url) {
         setSelectedChannel({
           ...channel,
           stream_url: data.stream_url
         });
+      } else {
+        setError('Stream URL alınamadı');
       }
     } catch (err) {
       console.error('Error fetching stream:', err);
+      setError('Stream yüklenirken hata oluştu');
     }
   };
 
-  const handleChannelDoubleClick = async (channel) => {
-    // Double click - open fullscreen player
-    setIsFullscreen(true);
+  const handleWatchClick = async (channel, e) => {
+    e.stopPropagation();
     
-    // Fetch stream URL
+    console.log('▶️ Playing channel:', channel.name);
+    
+    // Find channel index
+    const index = channels.findIndex(ch => ch.id === channel.id);
+    setCurrentChannelIndex(index);
+    
+    // Fetch stream URL from backend
     try {
       const backendUrl = process.env.REACT_APP_BACKEND_URL;
       const response = await fetch(
@@ -145,19 +132,26 @@ const LiveTVPage = () => {
       );
       const data = await response.json();
       
-      if (data.success) {
+      if (data.success && data.stream_url) {
+        console.log('Stream URL:', data.stream_url);
+        
+        // Open fullscreen player with stream - use URL directly
         setSelectedChannel({
           ...channel,
           stream_url: data.stream_url
         });
+      } else {
+        setError('Stream URL alınamadı');
       }
     } catch (err) {
       console.error('Error fetching stream:', err);
+      setError('Stream yüklenirken hata oluştu');
     }
   };
 
-  const closeFullscreenPlayer = () => {
-    setIsFullscreen(false);
+  const closePlayer = () => {
+    setSelectedChannel(null);
+    setCurrentChannelIndex(-1);
   };
 
   if (!deviceInfo) {
@@ -234,7 +228,7 @@ const LiveTVPage = () => {
           </div>
         </div>
 
-        {/* Center - Channel List */}
+        {/* Center - Channel List (Full Width, No Preview Player) */}
         <div className="flex-1 bg-[#0F171E] overflow-y-auto">
           <div className="p-6">
             <h2 className="text-2xl font-bold mb-4">
@@ -254,85 +248,68 @@ const LiveTVPage = () => {
                 Bu kategoride kanal bulunamadı
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {channels.map((channel) => (
                   <div
                     key={channel.id}
-                    onClick={() => handleChannelClick(channel)}
-                    className={`flex items-center gap-4 p-4 rounded-lg cursor-pointer transition ${
-                      selectedChannel?.id === channel.id
-                        ? 'bg-blue-600'
-                        : 'bg-[#1A242F] hover:bg-[#1A242F]/70'
-                    }`}
+                    className="bg-[#1A242F] rounded-lg p-4 hover:bg-[#1A242F]/70 transition"
                   >
                     {/* Channel Logo */}
-                    {channel.logo ? (
-                      <img
-                        src={getProxiedImageUrl(channel.logo)}
-                        alt={channel.name}
-                        className="w-16 h-16 object-contain rounded"
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                        }}
-                      />
-                    ) : (
-                      <div className="w-16 h-16 bg-gray-700 rounded flex items-center justify-center">
+                    <div className="w-full aspect-video bg-gray-700 rounded mb-3 flex items-center justify-center overflow-hidden">
+                      {channel.logo ? (
+                        <img
+                          src={getProxiedImageUrl(channel.logo)}
+                          alt={channel.name}
+                          className="w-full h-full object-contain"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                      ) : (
                         <span className="text-xs text-gray-400">NO LOGO</span>
-                      </div>
-                    )}
+                      )}
+                    </div>
 
                     {/* Channel Info */}
-                    <div className="flex-1">
+                    <div className="mb-3">
                       <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold">{channel.name}</h3>
+                        <h3 className="font-semibold text-sm truncate flex-1">{channel.name}</h3>
                         {channel.name.includes('4K') || channel.name.includes('UHD') ? (
-                          <span className="px-2 py-0.5 text-xs bg-red-600 rounded">UHD</span>
+                          <span className="px-2 py-0.5 text-xs bg-red-600 rounded flex-shrink-0">UHD</span>
                         ) : null}
                       </div>
-                      <p className="text-sm text-gray-400">Program Bulunamadı</p>
+                      <p className="text-xs text-gray-400">Canlı Yayın</p>
                     </div>
+
+                    {/* Watch Button */}
+                    <Button
+                      onClick={(e) => handleWatchClick(channel, e)}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                      size="sm"
+                    >
+                      <Play className="w-4 h-4 mr-2" />
+                      İzle
+                    </Button>
                   </div>
                 ))}
               </div>
             )}
           </div>
         </div>
-
-        {/* Right - Player Area */}
-        <div className="w-96 bg-black">
-          {selectedChannel ? (
-            selectedChannel.stream_url ? (
-              <VideoPlayer
-                streamUrl={selectedChannel.stream_url}
-                channelName={selectedChannel.name}
-                onClose={() => setSelectedChannel(null)}
-              />
-            ) : (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center p-6">
-                  <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-4" />
-                  <p className="text-gray-400">Stream hazırlanıyor...</p>
-                </div>
-              </div>
-            )
-          ) : (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center p-6">
-                <p className="text-gray-400">Tek tıklama: Burada oynat</p>
-                <p className="text-gray-400 text-sm mt-2">Çift tıklama: Tam ekran</p>
-              </div>
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Fullscreen Player Modal */}
-      {isFullscreen && selectedChannel?.stream_url && (
+      {selectedChannel?.stream_url && (
         <div className="fixed inset-0 z-50 bg-black">
           <VideoPlayer
             streamUrl={selectedChannel.stream_url}
-            channelName={selectedChannel.name}
-            onClose={closeFullscreenPlayer}
+            channel={selectedChannel}
+            channels={channels}
+            currentChannelIndex={currentChannelIndex}
+            onClose={closePlayer}
+            onChannelChange={handleChannelChange}
+            onToggleFavorite={toggleFavorite}
+            isFavorite={isFavorite}
           />
         </div>
       )}
