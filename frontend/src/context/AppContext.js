@@ -4,7 +4,7 @@ import axios from 'axios';
 
 const AppContext = createContext();
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 
 export const useApp = () => {
   const context = useContext(AppContext);
@@ -156,11 +156,25 @@ export const AppProvider = ({ children }) => {
 
   // Add playlist to device
   const addPlaylist = useCallback(async (deviceId, playlistData) => {
+    console.log('🔵 addPlaylist called:', { deviceId, playlistData, API_URL });
+    
     try {
-      const response = await axios.post(
-        `${API_URL}/api/device/${deviceId}/playlist`,
-        playlistData
-      );
+      // Check if API_URL is properly configured
+      if (!API_URL) {
+        console.error('❌ API_URL is not configured. Please check your .env file.');
+        return { 
+          success: false, 
+          error: 'API yapılandırması eksik. Lütfen yöneticiyle iletişime geçin.' 
+        };
+      }
+
+      const url = `${API_URL}/api/device/${deviceId}/playlist`;
+      console.log('📤 Sending POST request to:', url);
+      console.log('📦 Request payload:', playlistData);
+
+      const response = await axios.post(url, playlistData);
+      
+      console.log('✅ Response received:', response.data);
       
       if (response.data.success) {
         // Store full playlist data including password in localStorage for later use
@@ -171,19 +185,49 @@ export const AppProvider = ({ children }) => {
           }));
         }
         
-        // Refresh playlists
-        await fetchPlaylists(deviceId);
+        console.log('✅ Playlist added successfully');
         return { success: true, playlist: response.data.playlist };
       }
-      return { success: false, error: response.data.message };
+      
+      console.warn('⚠️ Response success is false:', response.data);
+      return { success: false, error: response.data.message || 'Bilinmeyen hata oluştu' };
     } catch (error) {
-      console.error('Failed to add playlist:', error);
+      console.error('❌ Failed to add playlist:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        code: error.code,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      
+      // Provide more specific error messages
+      if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+        return { 
+          success: false, 
+          error: 'Backend sunucusuna bağlanılamıyor. Sunucunun çalıştığından emin olun.' 
+        };
+      }
+      
+      if (error.response?.status === 404) {
+        return { 
+          success: false, 
+          error: 'Cihaz bulunamadı veya API endpoint mevcut değil.' 
+        };
+      }
+      
+      if (error.response?.status === 400) {
+        return { 
+          success: false, 
+          error: error.response?.data?.detail || 'Geçersiz istek. Girilen bilgileri kontrol edin.' 
+        };
+      }
+      
       return { 
         success: false, 
-        error: error.response?.data?.detail || 'Playlist eklenemedi' 
+        error: error.response?.data?.detail || error.message || 'Playlist eklenemedi. Lütfen tekrar deneyin.' 
       };
     }
-  }, [fetchPlaylists]);
+  }, []);
 
   // Delete playlist
   const deletePlaylist = useCallback(async (deviceId, playlistId) => {
@@ -306,8 +350,18 @@ export const AppProvider = ({ children }) => {
 
   // Step 1: Login to IPPL4Y application
   const loginToApp = async (username, password) => {
+    console.log('🔍 loginToApp called:', { username, hasPassword: !!password });
+    console.log('📦 ippl4yUsers:', ippl4yUsers);
+    
+    // Check if ippl4yUsers is loaded
+    if (!ippl4yUsers) {
+      console.error('❌ ippl4yUsers is not loaded!');
+      return { success: false, error: 'Authentication system not initialized' };
+    }
+    
     // Check superadmin
-    if (username === ippl4yUsers.superadmin.username && password === ippl4yUsers.superadmin.password) {
+    if (ippl4yUsers.superadmin && username === ippl4yUsers.superadmin.username && password === ippl4yUsers.superadmin.password) {
+      console.log('✅ Superadmin login successful');
       const userData = { ...ippl4yUsers.superadmin };
       localStorage.setItem('ippl4yUser', JSON.stringify(userData));
       setUser(userData);
@@ -316,43 +370,51 @@ export const AppProvider = ({ children }) => {
     }
 
     // Check admins
-    const admin = ippl4yUsers.admins.find(a => a.username === username && a.password === password);
-    if (admin) {
-      if (admin.paymentStatus !== 'active') {
-        return { success: false, error: 'Subscription expired. Please renew to continue.' };
+    if (ippl4yUsers.admins && Array.isArray(ippl4yUsers.admins)) {
+      const admin = ippl4yUsers.admins.find(a => a.username === username && a.password === password);
+      if (admin) {
+        console.log('✅ Admin login successful:', admin.username);
+        if (admin.paymentStatus !== 'active') {
+          return { success: false, error: 'Subscription expired. Please renew to continue.' };
+        }
+        const userData = { ...admin };
+        localStorage.setItem('ippl4yUser', JSON.stringify(userData));
+        setUser(userData);
+        setIsAuthenticated(true);
+        return { success: true, role: 'admin' };
       }
-      const userData = { ...admin };
-      localStorage.setItem('ippl4yUser', JSON.stringify(userData));
-      setUser(userData);
-      setIsAuthenticated(true);
-      return { success: true, role: 'admin' };
     }
 
     // Check users
-    const customer = ippl4yUsers.users.find(u => u.username === username && u.password === password);
-    if (customer) {
-      if (customer.paymentStatus !== 'active') {
-        return { success: false, error: 'IPPL4Y subscription expired. Please renew to continue.' };
-      }
-      const userData = { ...customer };
-      localStorage.setItem('ippl4yUser', JSON.stringify(userData));
-      setUser(userData);
-      setIsAuthenticated(true);
-      
-      // Auto-register device and fetch playlists for customer
-      try {
-        const creds = getDeviceCredentials();
-        const regResult = await registerDevice(creds.device_id, creds.device_key, 'web');
-        if (regResult.success) {
-          await fetchPlaylists(creds.device_id);
+    if (ippl4yUsers.users && Array.isArray(ippl4yUsers.users)) {
+      const customer = ippl4yUsers.users.find(u => u.username === username && u.password === password);
+      if (customer) {
+        console.log('✅ User login successful:', customer.username);
+        if (customer.paymentStatus !== 'active') {
+          return { success: false, error: 'IPPL4Y subscription expired. Please renew to continue.' };
         }
-      } catch (err) {
-        console.error('Failed to init device:', err);
+        const userData = { ...customer };
+        localStorage.setItem('ippl4yUser', JSON.stringify(userData));
+        setUser(userData);
+        setIsAuthenticated(true);
+        
+        // Auto-register device and fetch playlists for customer (don't block login)
+        const creds = getDeviceCredentials();
+        registerDevice(creds.device_id, creds.device_key, 'web')
+          .then((regResult) => {
+            if (regResult.success) {
+              return fetchPlaylists(creds.device_id);
+            }
+          })
+          .catch((err) => {
+            console.error('Failed to init device:', err);
+          });
+        
+        return { success: true, role: 'user', requiresIptvSetup: true };
       }
-      
-      return { success: true, role: 'user', requiresIptvSetup: true };
     }
 
+    console.log('❌ No matching user found');
     return { success: false, error: 'Invalid IPPL4Y credentials' };
   };
 

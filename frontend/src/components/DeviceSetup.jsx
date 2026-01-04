@@ -112,6 +112,13 @@ const DeviceSetup = () => {
     setError('');
     setSuccess('');
 
+    // Validate device credentials
+    if (!credentials.device_id) {
+      setError('Cihaz kimliği bulunamadı. Lütfen cihaz bilgilerini kontrol edin.');
+      return;
+    }
+
+    // Validate form fields
     if (!newPlaylist.playlist_name.trim()) {
       setError('Playlist adı gerekli');
       return;
@@ -130,63 +137,84 @@ const DeviceSetup = () => {
     }
 
     setIsAdding(true);
-
-    // Add playlist
-    const result = await addPlaylist(credentials.device_id, {
+    console.log('🟢 handleAddPlaylist: Starting playlist addition');
+    console.log('📋 Device ID:', credentials.device_id);
+    console.log('📋 Playlist Data:', {
       playlist_name: newPlaylist.playlist_name,
       playlist_url: newPlaylist.playlist_url,
-      playlist_type: newPlaylist.playlist_type,
-      xtream_username: newPlaylist.playlist_type === 'xtream' ? newPlaylist.xtream_username : null,
-      xtream_password: newPlaylist.playlist_type === 'xtream' ? newPlaylist.xtream_password : null
+      playlist_type: newPlaylist.playlist_type
     });
 
-    if (result.success) {
-      const playlistId = result.playlist?.id;
-      
-      if (playlistId) {
-        // Auto-parse the playlist
-        setSuccess('Playlist eklendi, kanallar yükleniyor...');
-        
-        try {
-          const backendUrl = process.env.REACT_APP_BACKEND_URL;
-          const parseRes = await fetch(`${backendUrl}/api/playlist/parse/${playlistId}`, {
-            method: 'POST'
-          });
-          const parseData = await parseRes.json();
-          
-          if (parseData.success) {
-            setSuccess(`✓ ${parseData.total_channels || 0} kanal yüklendi!`);
-          } else {
-            setSuccess('Playlist eklendi');
-          }
-        } catch (err) {
-          console.error('Parse error:', err);
-          setSuccess('Playlist eklendi');
-        }
-      } else {
-        setSuccess('Playlist başarıyla eklendi!');
-      }
-      
-      setNewPlaylist({
-        playlist_name: '',
-        playlist_url: '',
-        playlist_type: 'm3u',
-        xtream_username: '',
-        xtream_password: ''
+    try {
+      // Add playlist
+      console.log('📞 Calling addPlaylist function...');
+      const result = await addPlaylist(credentials.device_id, {
+        playlist_name: newPlaylist.playlist_name,
+        playlist_url: newPlaylist.playlist_url,
+        playlist_type: newPlaylist.playlist_type,
+        xtream_username: newPlaylist.playlist_type === 'xtream' ? newPlaylist.xtream_username : null,
+        xtream_password: newPlaylist.playlist_type === 'xtream' ? newPlaylist.xtream_password : null
       });
       
-      // Refresh playlists
-      await fetchPlaylists();
-      
-      // After 2 seconds, navigate to home
-      setTimeout(() => {
-        navigate('/home');
-      }, 2000);
-    } else {
-      setError(result.error);
-    }
+      console.log('📥 addPlaylist result:', result);
 
-    setIsAdding(false);
+      if (result.success) {
+        const playlistId = result.playlist?.id;
+        
+        if (playlistId) {
+          // Auto-parse the playlist
+          setSuccess('Playlist eklendi, kanallar yükleniyor...');
+          
+          try {
+            const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
+            const parseRes = await fetch(`${backendUrl}/api/playlist/parse/${playlistId}`, {
+              method: 'POST'
+            });
+            
+            if (parseRes.ok) {
+              const parseData = await parseRes.json();
+              
+              if (parseData.success) {
+                setSuccess(`✓ ${parseData.total_channels || 0} kanal yüklendi!`);
+              } else {
+                setSuccess('Playlist eklendi');
+              }
+            } else {
+              setSuccess('Playlist eklendi');
+            }
+          } catch (err) {
+            console.error('Parse error:', err);
+            setSuccess('Playlist eklendi');
+          }
+        } else {
+          setSuccess('Playlist başarıyla eklendi!');
+        }
+        
+        // Reset form
+        setNewPlaylist({
+          playlist_name: '',
+          playlist_url: '',
+          playlist_type: 'm3u',
+          xtream_username: '',
+          xtream_password: ''
+        });
+        
+        // Refresh playlists
+        await fetchPlaylists(credentials.device_id);
+        
+        // After 2 seconds, navigate to home
+        setTimeout(() => {
+          navigate('/home');
+        }, 2000);
+      } else {
+        setError(result.error || 'Playlist eklenirken bir hata oluştu');
+      }
+    } catch (err) {
+      console.error('Playlist ekleme hatası:', err);
+      setError('Playlist eklenirken beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.');
+    } finally {
+      setIsAdding(false);
+    }
   };
 
   const handleDeletePlaylist = async (playlistId) => {

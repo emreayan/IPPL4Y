@@ -1239,10 +1239,9 @@ async def parse_xtream_full_data(server_url: str, username: str, password: str) 
                     'channels': []
                 }
             
-            # Build stream URL
+            # Build stream URL - always use .m3u8 for Xtream streams
             stream_id = stream.get('stream_id')
-            extension = stream.get('container_extension', 'ts')
-            stream_url = f"{base_url}/live/{username}/{password}/{stream_id}.{extension}"
+            stream_url = f"{base_url}/live/{username}/{password}/{stream_id}.m3u8"
             
             categories_dict[cat_id]['channels'].append({
                 'id': str(stream_id),
@@ -1677,26 +1676,10 @@ async def get_channel_stream(channel_id: str, device_id: str):
         if not channel:
             raise HTTPException(status_code=404, detail="Kanal bulunamadı")
         
-        # Get original stream URL
-        original_stream_url = channel.get('stream_url')
-        
-        # If stream is HTTP and we're on HTTPS, use proxy
-        if original_stream_url and original_stream_url.startswith('http://'):
-            # Create proxied URL
-            from urllib.parse import quote
-            proxied_url = f"{os.environ.get('REACT_APP_BACKEND_URL', '')}/api/stream/proxy?url={quote(original_stream_url)}"
-            
-            return {
-                "success": True,
-                "channel": channel,
-                "stream_url": proxied_url,
-                "original_url": original_stream_url
-            }
-        
         return {
             "success": True,
             "channel": channel,
-            "stream_url": original_stream_url
+            "stream_url": channel.get('stream_url')
         }
         
     except HTTPException:
@@ -1714,6 +1697,12 @@ async def proxy_stream(url: str, request: Request):
     Supports both HLS manifests (.m3u8) and video segments (.ts)
     """
     try:
+        # #region agent log (H1-proxy-entry)
+        import json, time
+        with open(r'c:\Users\ayane\IPPL4Y\IPPL4Y-Cursor\IPPL4Y\.cursor\debug.log', 'a', encoding='utf-8') as f:
+            f.write(json.dumps({"sessionId": "debug-session", "runId": "run-backend-alive", "hypothesisId": "H1-backend-running", "location": "server.py:proxy_stream:entry", "message": "Proxy stream endpoint hit", "data": {"url": url[:200], "request_base": str(request.base_url)}, "timestamp": int(time.time() * 1000)}) + "\n")
+        # #endregion
+        
         logger.info(f"Proxying stream: {url[:80]}...")
         
         # Determine content type based on URL
@@ -1726,6 +1715,11 @@ async def proxy_stream(url: str, request: Request):
             'X-Forwarded-For': '85.95.236.89',
             'X-Real-IP': '85.95.236.89'
         }
+        
+        # #region agent log (H2-manifest-check)
+        with open(r'c:\Users\ayane\IPPL4Y\IPPL4Y-Cursor\IPPL4Y\.cursor\debug.log', 'a', encoding='utf-8') as f:
+            f.write(json.dumps({"sessionId": "debug-session", "runId": "run-backend-alive", "hypothesisId": "H2-manifest-type", "location": "server.py:proxy_stream:type-check", "message": "Content type determined", "data": {"is_manifest": is_manifest, "content_type": content_type}, "timestamp": int(time.time() * 1000)}) + "\n")
+        # #endregion
         
         if is_manifest:
             # For manifests, we need to rewrite URLs inside the manifest
@@ -1756,7 +1750,12 @@ async def proxy_stream(url: str, request: Request):
                         # Only proxy HTTP URLs
                         if segment_url.startswith('http://'):
                             from urllib.parse import quote
-                            rewritten_lines.append(f"{backend_url}api/stream/proxy?url={quote(segment_url)}")
+                            rewritten_url = f"{backend_url}/api/stream/proxy?url={quote(segment_url)}"
+                            # #region agent log (H3-rewrite-url)
+                            with open(r'c:\Users\ayane\IPPL4Y\IPPL4Y-Cursor\IPPL4Y\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                                f.write(json.dumps({"sessionId": "debug-session", "runId": "run-backend-alive", "hypothesisId": "H3-url-rewrite", "location": "server.py:proxy_stream:manifest-rewrite", "message": "URL rewritten", "data": {"backend_url": backend_url, "segment_url": segment_url[:150], "rewritten": rewritten_url[:150]}, "timestamp": int(time.time() * 1000)}) + "\n")
+                            # #endregion
+                            rewritten_lines.append(rewritten_url)
                         else:
                             rewritten_lines.append(segment_url)
                     else:
@@ -1774,10 +1773,28 @@ async def proxy_stream(url: str, request: Request):
                 )
         else:
             # For .ts segments, stream the content
+            # #region agent log (H4-ts-segment-entry)
+            with open(r'c:\Users\ayane\IPPL4Y\IPPL4Y-Cursor\IPPL4Y\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                f.write(json.dumps({"sessionId": "debug-session", "runId": "run-backend-alive", "hypothesisId": "H4-ts-streaming", "location": "server.py:proxy_stream:ts-segment", "message": "Streaming TS segment", "data": {"url": url[:200]}, "timestamp": int(time.time() * 1000)}) + "\n")
+            # #endregion
+            
             async def stream_generator():
                 async with httpx.AsyncClient(timeout=60.0) as client:
                     async with client.stream("GET", url, headers=headers, follow_redirects=True) as response:
+                        # #region agent log (H5-stream-response)
+                        with open(r'c:\Users\ayane\IPPL4Y\IPPL4Y-Cursor\IPPL4Y\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                            f.write(json.dumps({"sessionId": "debug-session", "runId": "run-backend-alive", "hypothesisId": "H5-upstream-response", "location": "server.py:stream_generator:response", "message": "Got upstream response", "data": {"status": response.status_code, "content_type": response.headers.get("content-type", "")}, "timestamp": int(time.time() * 1000)}) + "\n")
+                        # #endregion
+                        chunk_count = 0
+                        total_bytes = 0
                         async for chunk in response.aiter_bytes(chunk_size=65536):
+                            chunk_count += 1
+                            total_bytes += len(chunk)
+                            if chunk_count == 1:
+                                # #region agent log (H6-first-chunk)
+                                with open(r'c:\Users\ayane\IPPL4Y\IPPL4Y-Cursor\IPPL4Y\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                                    f.write(json.dumps({"sessionId": "debug-session", "runId": "run-backend-alive", "hypothesisId": "H6-chunk-streaming", "location": "server.py:stream_generator:first-chunk", "message": "First chunk yielded", "data": {"chunk_size": len(chunk), "chunk_count": chunk_count, "total_bytes": total_bytes}, "timestamp": int(time.time() * 1000)}) + "\n")
+                                # #endregion
                             yield chunk
             
             return StreamingResponse(

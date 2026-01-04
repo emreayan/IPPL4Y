@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Button } from './ui/button';
@@ -14,33 +14,52 @@ const Login = () => {
   const [appUsername, setAppUsername] = useState('');
   const [appPassword, setAppPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const { loginToApp, customLogo, logoLoading } = useApp();
   const navigate = useNavigate();
+  
+  // Refs for form inputs as fallback
+  const usernameRef = useRef(null);
+  const passwordRef = useRef(null);
 
   const handleLogin = async (e, role) => {
     e.preventDefault();
     setError('');
+    setIsLoading(true);
 
-    if (!appUsername || !appPassword) {
+    // Get values from state, fallback to ref values if state is empty
+    const username = appUsername || usernameRef.current?.value || '';
+    const password = appPassword || passwordRef.current?.value || '';
+
+    console.log('🔐 Login attempt:', { username, role });
+
+    if (!username || !password) {
       setError('Tüm alanları doldurun');
+      setIsLoading(false);
       return;
     }
 
-    const result = await loginToApp(appUsername, appPassword);
-    
-    if (result.success) {
-      // After successful login, check if user has playlists
-      // If yes, go to home; if no, go to device setup
-      // For now, always go to device-setup first time, then user can navigate
-      // We'll let the HomePage check and show warning if no playlist
-      navigate('/home');
-    } else {
-      setError(result.error);
+    try {
+      const result = await loginToApp(username, password);
+      console.log('📋 Login result:', result);
+      
+      if (result.success) {
+        console.log('✅ Login successful, navigating to /home');
+        navigate('/home');
+      } else {
+        console.error('❌ Login failed:', result.error);
+        setError(result.error || 'Giriş başarısız');
+      }
+    } catch (err) {
+      console.error('💥 Login error:', err);
+      setError('Giriş sırasında bir hata oluştu: ' + err.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const renderLoginForm = (role, title, description) => (
-    <form onSubmit={(e) => handleLogin(e, role)} className="space-y-4">
+    <form onSubmit={(e) => handleLogin(e, role)} className="space-y-4" autoComplete="off">
       {error && (
         <Alert variant="destructive" className="bg-destructive/10 border-destructive/50">
           <AlertCircle className="h-4 w-4" />
@@ -49,42 +68,49 @@ const Login = () => {
       )}
       
       <div className="space-y-2">
-        <Label htmlFor="username" className="text-foreground">Platform Kullanıcı Adı</Label>
+        <Label htmlFor={`username-${role}`} className="text-foreground">Platform Kullanıcı Adı</Label>
         <div className="relative">
           <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
-            id="username"
+            ref={role === activeTab ? usernameRef : undefined}
+            id={`username-${role}`}
+            name={`username-${role}`}
             type="text"
             placeholder="IPPL4Y üyelik kullanıcı adınız"
             value={appUsername}
             onChange={(e) => setAppUsername(e.target.value)}
             className="pl-10 bg-secondary/50 border-border text-foreground placeholder:text-muted-foreground"
-            required
+            autoComplete="username"
+            disabled={isLoading}
           />
         </div>
       </div>
       
       <div className="space-y-2">
-        <Label htmlFor="password" className="text-foreground">Platform Şifre</Label>
+        <Label htmlFor={`password-${role}`} className="text-foreground">Platform Şifre</Label>
         <div className="relative">
           <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
-            id="password"
+            ref={role === activeTab ? passwordRef : undefined}
+            id={`password-${role}`}
+            name={`password-${role}`}
             type="password"
             placeholder="IPPL4Y üyelik şifreniz"
             value={appPassword}
             onChange={(e) => setAppPassword(e.target.value)}
             className="pl-10 bg-secondary/50 border-border text-foreground placeholder:text-muted-foreground"
-            required
+            autoComplete="current-password"
+            disabled={isLoading}
           />
         </div>
       </div>
       
       <Button
         type="submit"
-        className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-primary-foreground font-semibold py-6 text-lg transition-all duration-300 shadow-lg shadow-primary/30"
+        disabled={isLoading}
+        className="w-full bg-[#75a55d] hover:bg-[#6a9552] text-[#0a0a0a] font-semibold py-6 text-lg transition-all duration-300 shadow-lg shadow-[#75a55d]/30 disabled:opacity-50"
       >
-        Giriş Yap
+        {isLoading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
       </Button>
     </form>
   );
@@ -92,29 +118,35 @@ const Login = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[hsl(214,32%,8%)] via-[hsl(214,28%,12%)] to-[hsl(214,32%,8%)] flex items-center justify-center p-4">
       <Card className="w-full max-w-md bg-card/50 border-border backdrop-blur-xl">
-        <CardHeader className="space-y-4 text-center">
-          {/* Dynamic Logo */}
+        <CardHeader className="space-y-4 text-center px-6">
+          {/* Transparent Logo - Centered */}
           {customLogo ? (
-            <div className="mx-auto w-16 h-16 rounded-2xl overflow-hidden shadow-lg shadow-primary/20">
-              <img 
-                src={customLogo} 
-                alt="IPPL4Y Logo" 
-                className="w-full h-full object-contain"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                  e.target.nextSibling.style.display = 'flex';
-                }}
-              />
-              <div className="hidden w-full h-full bg-gradient-to-br from-primary to-accent items-center justify-center">
-                <Tv className="w-8 h-8 text-primary-foreground" />
+            <div className="w-full flex justify-center items-center">
+              <div className="w-[432px] h-36 flex items-center justify-center">
+                <img 
+                  src={customLogo} 
+                  alt="IPPL4Y Logo" 
+                  className="max-w-full max-h-full object-contain"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
+                />
               </div>
             </div>
           ) : (
-            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20">
-              <Tv className="w-8 h-8 text-primary-foreground" />
+            <div className="w-full flex justify-center items-center">
+              <div className="w-[432px] h-36 flex items-center justify-center">
+                <img 
+                  src="/ippl4y-logo.png" 
+                  alt="IPPL4Y Logo" 
+                  className="max-w-full max-h-full object-contain"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
+                />
+              </div>
             </div>
           )}
-          <CardTitle className="text-3xl font-bold text-foreground">IPPL4Y</CardTitle>
           <CardDescription className="text-muted-foreground">
             Hesap tipinizi seçin ve giriş yapın
           </CardDescription>

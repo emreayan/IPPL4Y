@@ -7,6 +7,7 @@ import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { ScrollArea } from './ui/scroll-area';
 import { Alert, AlertDescription } from './ui/alert';
+import VideoPlayer from './VideoPlayer';
 import { 
   Tv, 
   Play, 
@@ -25,13 +26,16 @@ const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const LiveTVContent = () => {
   const navigate = useNavigate();
-  const { activePlaylist, iptvService, toggleFavorite, isFavorite } = useApp();
+  const { activePlaylist, iptvService, toggleFavorite, isFavorite, deviceInfo } = useApp();
   
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedChannel, setSelectedChannel] = useState(null);
+  const [currentChannelIndex, setCurrentChannelIndex] = useState(-1);
+  const [streamLoading, setStreamLoading] = useState(false);
 
   // Fetch channels from API
   const fetchChannels = useCallback(async () => {
@@ -86,6 +90,69 @@ const LiveTVContent = () => {
         type: 'live' 
       } 
     });
+  };
+
+  const handleChannelChange = async (channel, index) => {
+    setCurrentChannelIndex(index);
+    
+    try {
+      const backendUrl = process.env.REACT_APP_BACKEND_URL;
+      const response = await fetch(
+        `${backendUrl}/api/channels/stream/${channel.id}?device_id=${deviceInfo.device_id}`
+      );
+      const data = await response.json();
+      
+      if (data.success && data.stream_url) {
+        setSelectedChannel({
+          ...channel,
+          stream_url: data.stream_url
+        });
+      } else {
+        setError('Stream URL alınamadı');
+      }
+    } catch (err) {
+      console.error('Error fetching stream:', err);
+      setError('Stream yüklenirken hata oluştu');
+    }
+  };
+
+  const handleWatchClick = async (channel, e) => {
+    e.stopPropagation();
+    
+    console.log('▶️ Playing channel:', channel.name);
+    
+    // Find channel index
+    const index = filteredChannels.findIndex(ch => ch.id === channel.id);
+    setCurrentChannelIndex(index);
+    
+    // Fetch stream URL from backend
+    try {
+      const backendUrl = process.env.REACT_APP_BACKEND_URL;
+      const response = await fetch(
+        `${backendUrl}/api/channels/stream/${channel.id}?device_id=${deviceInfo.device_id}`
+      );
+      const data = await response.json();
+      
+      if (data.success && data.stream_url) {
+        console.log('Stream URL:', data.stream_url);
+        
+        // Open fullscreen player with stream - use URL directly
+        setSelectedChannel({
+          ...channel,
+          stream_url: data.stream_url
+        });
+      } else {
+        setError('Stream URL alınamadı');
+      }
+    } catch (err) {
+      console.error('Error fetching stream:', err);
+      setError('Stream yüklenirken hata oluştu');
+    }
+  };
+
+  const closePlayer = () => {
+    setSelectedChannel(null);
+    setCurrentChannelIndex(-1);
   };
 
   if (!activePlaylist) {
@@ -238,8 +305,14 @@ const LiveTVContent = () => {
                       <Button
                         size="sm"
                         className="bg-primary hover:bg-primary/90"
+                        onClick={(e) => handleWatchClick(channel, e)}
+                        disabled={streamLoading}
                       >
-                        <Play className="w-4 h-4 mr-1" />
+                        {streamLoading ? (
+                          <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                        ) : (
+                          <Play className="w-4 h-4 mr-1" />
+                        )}
                         İzle
                       </Button>
                     </div>
@@ -252,6 +325,22 @@ const LiveTVContent = () => {
           </div>
         </ScrollArea>
       </div>
+
+      {/* Fullscreen Player Modal */}
+      {selectedChannel?.stream_url && (
+        <div className="fixed inset-0 z-50 bg-black">
+          <VideoPlayer
+            streamUrl={selectedChannel.stream_url}
+            channel={selectedChannel}
+            channels={filteredChannels}
+            currentChannelIndex={currentChannelIndex}
+            onClose={closePlayer}
+            onChannelChange={handleChannelChange}
+            onToggleFavorite={toggleFavorite}
+            isFavorite={isFavorite}
+          />
+        </div>
+      )}
     </div>
   );
 };

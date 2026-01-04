@@ -3,6 +3,11 @@
 # IDE and editors
 .idea/
 .vscode/
+.cursor/
+
+# Temporary files
+*.log
+temp_*.txt
 
 # Dependencies
 node_modules/
